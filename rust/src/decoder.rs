@@ -10,9 +10,9 @@
 //! - 两级缓存 (内存 + 磁盘)
 //! - 图像后处理 (滤镜)
 
-use std::io::Cursor;
 use image::{GenericImageView, ImageFormat};
 use rayon::prelude::*;
+use std::io::Cursor;
 
 use crate::archive::extract_file_from_archive;
 use crate::cache::{clamp_image_dimensions, SharedImageCache};
@@ -86,7 +86,6 @@ impl ImageDecoder {
         self.disk_cache = Some(disk_cache);
         self
     }
-
 
     /// 解码单张图片
     ///
@@ -167,7 +166,6 @@ impl ImageDecoder {
         // 4. 解码图像
         let image_data = self.decode_image(&data, max_width, max_height)?;
 
-
         // 5. 存入缓存
         if let Some(cache) = &self.cache {
             cache.insert(cache_key.clone(), image_data.clone());
@@ -224,8 +222,7 @@ impl ImageDecoder {
 
         // 编码为 PNG
         let mut png_data = Vec::new();
-        thumb
-            .write_to(&mut Cursor::new(&mut png_data), ImageFormat::Png)?;
+        thumb.write_to(&mut Cursor::new(&mut png_data), ImageFormat::Png)?;
 
         Ok(png_data)
     }

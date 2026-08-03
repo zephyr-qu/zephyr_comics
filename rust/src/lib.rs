@@ -36,34 +36,36 @@ pub mod api;
 mod frb_generated;
 
 // 核心模块
-mod error;
-mod types;
-mod sort;
-mod cache;
 mod archive;
+mod cache;
 mod decoder;
+mod error;
+mod sort;
+mod types;
 
 // 扩展模块
+mod archive_cache;
 mod disk_cache;
+mod library_db;
+mod library_scanner;
+mod metadata;
 mod preload_strategy;
 mod reading_progress;
-mod library_db;
-mod metadata;
-mod library_scanner;
-mod archive_cache;
 
 // 重新导出常用类型，方便外部使用
-pub use error::{ComicError, Result};
-pub use types::{
-    ChapterInfo, ComicFormat, ComicInfo, ImageData, PageKey, ReadProgress,
-    ThumbnailData,
+pub use archive_cache::{
+    clear_global_cache, get_global_archive_cache, get_global_cache_stats, set_global_cache_size,
+    ArchiveCache, ArchiveCacheStats,
 };
 pub use cache::{CacheStats, ImageCache, SharedImageCache};
 pub use decoder::{DecoderConfig, ImageDecoder};
 pub use disk_cache::{DiskCache, DiskCacheConfig, DiskCacheStats, SharedDiskCache};
-pub use preload_strategy::{PreloadStrategy, ReadingDirection};
-pub use reading_progress::{ReadingProgress, Bookmark, ReadingStats};
+pub use error::{ComicError, Result};
 pub use library_db::{LibraryDatabase, LibraryEntry};
-pub use metadata::ComicMetadata;
 pub use library_scanner::LibraryScanner;
-pub use archive_cache::{ArchiveCache, ArchiveCacheStats, get_global_archive_cache, set_global_cache_size, get_global_cache_stats, clear_global_cache};
+pub use metadata::ComicMetadata;
+pub use preload_strategy::{PreloadStrategy, ReadingDirection};
+pub use reading_progress::{Bookmark, ReadingProgress, ReadingStats};
+pub use types::{
+    ChapterInfo, ComicFormat, ComicInfo, ImageData, PageKey, ReadProgress, ThumbnailData,
+};

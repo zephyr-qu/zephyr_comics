@@ -73,6 +73,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DiskCacheStats dco_decode_disk_cache_stats(dynamic raw);
 
   @protected
+  EncodedPage dco_decode_encoded_page(dynamic raw);
+
+  @protected
   double dco_decode_f_32(dynamic raw);
 
   @protected
@@ -216,6 +219,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DiskCacheStats sse_decode_disk_cache_stats(SseDeserializer deserializer);
+
+  @protected
+  EncodedPage sse_decode_encoded_page(SseDeserializer deserializer);
 
   @protected
   double sse_decode_f_32(SseDeserializer deserializer);
@@ -377,6 +383,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     DiskCacheStats self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_encoded_page(EncodedPage self, SseSerializer serializer);
 
   @protected
   void sse_encode_f_32(double self, SseSerializer serializer);

@@ -1,5 +1,5 @@
 name: zephyr_comics
-description: "A new Flutter project."
+description: "Offline CBZ comic reader for Android."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 0.1.0+1
 
 environment:
   sdk: ^3.10.9
@@ -30,12 +30,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
-  signals_flutter: any
-  go_router: any
-  extended_image: any
-  shared_preferences: any
-  scrollable_positioned_list: any
+  cupertino_icons: ^1.0.9
+  signals_flutter: ^7.1.0
+  go_router: ^17.3.0
+  extended_image: ^10.1.0
+  shared_preferences: ^2.5.5
+  scrollable_positioned_list: ^0.3.8
+  file_picker: ^11.0.2
   rust_lib_zephyr_comics:
     path: rust_builder
   flutter_rust_bridge: 2.12.0

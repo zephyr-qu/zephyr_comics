@@ -2,8 +2,6 @@
 //!
 //! 管理用户的阅读进度和书签。
 
-use flutter_rust_bridge::frb;
-
 /// 阅读进度
 ///
 /// 记录用户在漫画中的阅读位置。
@@ -118,11 +116,11 @@ mod tests {
     fn test_reading_progress_update() {
         let mut progress = ReadingProgress::new("test.cbz".to_string(), 0, 0);
         progress.update_page(50, 100);
-        
+
         assert_eq!(progress.page_index, 50);
         assert!((progress.completion_percent - 50.0).abs() < 0.1);
         assert!(!progress.is_completed());
-        
+
         progress.update_page(99, 100);
         assert!(progress.is_completed());
     }

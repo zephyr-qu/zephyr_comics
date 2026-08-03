@@ -3,8 +3,7 @@ pub fn greet(name: String) -> String {
     format!("Hello, {name}!")
 }
 
-#[flutter_rust_bridge::frb(init)]
+// 保留此函数供 FRB 兼容（实际的初始化在 api/comic.rs 中）
 pub fn init_app() {
-    // Default utilities - feel free to customize
     flutter_rust_bridge::setup_default_user_utils();
 }

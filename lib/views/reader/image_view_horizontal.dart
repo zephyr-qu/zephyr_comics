@@ -10,7 +10,7 @@ class ImageViewHorizontal extends StatefulWidget {
   final Widget? Function(ExtendedImageState state) loadStateChanged;
   final Function(ExtendedImageGestureState state) onDoubleTap;
   final GestureConfig Function(ExtendedImageState state)
-      initGestureConfigHandler;
+  initGestureConfigHandler;
 
   const ImageViewHorizontal({
     super.key,
@@ -27,7 +27,8 @@ class ImageViewHorizontal extends StatefulWidget {
   State<ImageViewHorizontal> createState() => _ImageViewHorizontalState();
 }
 
-class _ImageViewHorizontalState extends State<ImageViewHorizontal> {
+class _ImageViewHorizontalState extends State<ImageViewHorizontal>
+    with AutomaticKeepAliveClientMixin<ImageViewHorizontal> {
   bool _isLoading = true;
   bool _hasCache = false;
 
@@ -46,6 +47,7 @@ class _ImageViewHorizontalState extends State<ImageViewHorizontal> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (_isLoading) {
       return const SizedBox(
         height: 200,
@@ -57,7 +59,9 @@ class _ImageViewHorizontalState extends State<ImageViewHorizontal> {
       return Container(
         color: Colors.black,
         height: MediaQuery.of(context).size.height * 0.8,
-        child: const Center(child: Icon(Icons.broken_image, color: Colors.grey, size: 64)),
+        child: const Center(
+          child: Icon(Icons.broken_image, color: Colors.grey, size: 64),
+        ),
       );
     }
 
@@ -72,4 +76,7 @@ class _ImageViewHorizontalState extends State<ImageViewHorizontal> {
       onDoubleTap: widget.onDoubleTap,
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }

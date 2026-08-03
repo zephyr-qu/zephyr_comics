@@ -7,11 +7,10 @@
 //! - 文件列表智能排序
 
 use std::fs::File;
-use std::io::Read;
 use std::path::Path;
 
 use crate::error::{ComicError, Result};
-use crate::sort::{filter_image_files, smart_sort};
+use crate::sort::{filter_image_files, natural_sort};
 use crate::types::{ChapterInfo, ComicFormat, ComicInfo};
 
 /// 获取漫画文件信息
@@ -79,7 +78,10 @@ fn extract_zip_contents(file_path: &str) -> Result<Vec<ChapterInfo>> {
 
     // 过滤并排序图像文件
     let image_files = filter_image_files(&files);
-    let sorted_files = smart_sort(&image_files);
+    // The page sequence is the full archive path in natural order. Cover
+    // preference is resolved separately from ComicInfo.xml by the library
+    // scanner and must not silently reorder pages for the reader.
+    let sorted_files = natural_sort(&image_files);
 
     // 单章节漫画
     let image_count = sorted_files.len();
@@ -132,9 +134,21 @@ mod tests {
 
     #[test]
     fn test_is_valid_comic_file() {
-        assert!(is_valid_comic_file("test.cbz"));
-        assert!(!is_valid_comic_file("test.txt"));
-        assert!(!is_valid_comic_file("nonexistent.cbz"));
+        let fixture =
+            std::env::temp_dir().join(format!("zephyr-archive-valid-comic-{}", std::process::id()));
+        let cbz = fixture.with_extension("cbz");
+        let txt = fixture.with_extension("txt");
+        std::fs::write(&cbz, []).expect("create CBZ path fixture");
+        std::fs::write(&txt, []).expect("create TXT path fixture");
+
+        assert!(is_valid_comic_file(&cbz.to_string_lossy()));
+        assert!(!is_valid_comic_file(&txt.to_string_lossy()));
+        assert!(!is_valid_comic_file(
+            &fixture.with_extension("missing.cbz").to_string_lossy()
+        ));
+
+        let _ = std::fs::remove_file(cbz);
+        let _ = std::fs::remove_file(txt);
     }
 
     #[test]

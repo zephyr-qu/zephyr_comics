@@ -12,17 +12,21 @@
 use flutter_rust_bridge::frb;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use crate::archive::{get_comic_info as archive_get_info, is_valid_comic_file};
+use crate::archive::{
+    extract_file_from_archive, get_comic_info as archive_get_info, is_valid_comic_file,
+};
+use crate::archive_cache::{
+    clear_global_cache, get_global_cache_stats, set_global_cache_size, ArchiveCacheStats,
+};
 use crate::cache::SharedImageCache;
 use crate::decoder::{DecoderConfig, ImageDecoder};
-use crate::error::{ComicError, Result};
-use crate::types::{ComicInfo, ImageData, ThumbnailData};
 use crate::disk_cache::{DiskCacheConfig, DiskCacheStats, SharedDiskCache};
-use crate::preload_strategy::{PreloadStrategy, ReadingDirection, PreloadManager};
-use crate::reading_progress::{ReadingProgress, Bookmark, ReadingStats};
-use crate::library_db::{LibraryEntry, init_global_db, get_global_db};
-use crate::metadata::{ComicMetadata, extract_metadata};
-use crate::archive_cache::{ArchiveCacheStats, set_global_cache_size, get_global_cache_stats, clear_global_cache};
+use crate::error::{ComicError, Result};
+use crate::library_db::{get_global_db, init_global_db, LibraryEntry};
+use crate::metadata::{extract_metadata, ComicMetadata};
+use crate::preload_strategy::{PreloadManager, PreloadStrategy, ReadingDirection};
+use crate::reading_progress::{Bookmark, ReadingProgress, ReadingStats};
+use crate::types::{ComicInfo, EncodedPage, ImageData, ThumbnailData};
 
 /// 全局缓存实例 (懒初始化)
 static IMAGE_CACHE: OnceLock<SharedImageCache> = OnceLock::new();
@@ -59,7 +63,8 @@ pub fn init_app() {
     );
 
     #[cfg(not(target_os = "android"))]
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).try_init();
+    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .try_init();
 
     // 初始化内存缓存
     let cache = SharedImageCache::new(DEFAULT_CACHE_SIZE_MB);
@@ -81,9 +86,8 @@ pub fn init_app() {
 
     // 初始化解码器 (使用内存缓存)
     let config = DecoderConfig::new(DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT);
-    let decoder = ImageDecoder::new(config).with_cache(
-        IMAGE_CACHE.get().expect("内存缓存应该已初始化")
-    .clone());
+    let decoder = ImageDecoder::new(config)
+        .with_cache(IMAGE_CACHE.get().expect("内存缓存应该已初始化").clone());
     DECODER.get_or_init(|| decoder);
 
     // 初始化数据库 (阅读进度/书签/书架)
@@ -110,7 +114,6 @@ pub fn get_cache_stats() -> crate::cache::CacheStats {
         }
     }
 }
-
 
 /// 获取漫画文件信息
 ///
@@ -169,8 +172,16 @@ pub async fn get_page_image(
     }
 
     let file_name = &chapter.image_files[page_index as usize];
-    let max_w = if max_width > 0 { max_width } else { DEFAULT_MAX_WIDTH as i32 } as u32;
-    let max_h = if max_height > 0 { max_height } else { DEFAULT_MAX_HEIGHT as i32 } as u32;
+    let max_w = if max_width > 0 {
+        max_width
+    } else {
+        DEFAULT_MAX_WIDTH as i32
+    } as u32;
+    let max_h = if max_height > 0 {
+        max_height
+    } else {
+        DEFAULT_MAX_HEIGHT as i32
+    } as u32;
 
     // 使用解码器解码
     if let Some(decoder) = DECODER.get() {
@@ -178,6 +189,172 @@ pub async fn get_page_image(
     } else {
         // 解码器未初始化，使用便捷函数
         crate::decoder::decode_page(&file_path, file_name, max_w, max_h)
+    }
+}
+
+/// Decode a page and return an explicitly PNG-encoded payload.
+#[frb(dart_async)]
+pub async fn get_page_image_png(
+    file_path: String,
+    page_index: i32,
+    max_width: i32,
+    max_height: i32,
+) -> Result<EncodedPage> {
+    let image = get_page_image(file_path, page_index, max_width, max_height).await?;
+    encode_page_png(image)
+}
+
+/// Extract a page in its original encoded image format.
+///
+/// Unlike [`get_page_image_png`], this path does not decode the archive entry
+/// into RGBA pixels or encode it again. The returned bytes are the original
+/// encoded image payload stored in the comic archive.
+#[frb(dart_async)]
+pub async fn get_page_image_encoded(file_path: String, page_index: i32) -> Result<Vec<u8>> {
+    extract_page_image_encoded(&file_path, page_index)
+}
+
+fn extract_page_image_encoded(file_path: &str, page_index: i32) -> Result<Vec<u8>> {
+    let info = archive_get_info(file_path)?;
+    let chapter = info
+        .chapters
+        .first()
+        .ok_or_else(|| ComicError::ArchiveError("漫画文件为空".to_string()))?;
+
+    if page_index < 0 || page_index as usize >= chapter.image_files.len() {
+        return Err(ComicError::PageIndexOutOfBounds {
+            requested: usize::try_from(page_index).unwrap_or(usize::MAX),
+            total: chapter.image_files.len(),
+        });
+    }
+
+    extract_file_from_archive(file_path, &chapter.image_files[page_index as usize])
+}
+
+fn encode_page_png(image: ImageData) -> Result<EncodedPage> {
+    use image::{DynamicImage, ImageOutputFormat, RgbaImage};
+    use std::io::Cursor;
+
+    let width = u32::try_from(image.width)
+        .map_err(|_| ComicError::DecodeError("图片宽度无效".to_string()))?;
+    let height = u32::try_from(image.height)
+        .map_err(|_| ComicError::DecodeError("图片高度无效".to_string()))?;
+    let rgba = RgbaImage::from_raw(width, height, image.data)
+        .ok_or_else(|| ComicError::DecodeError("RGBA 像素长度与图片尺寸不匹配".to_string()))?;
+    let mut png_data = Vec::new();
+    DynamicImage::ImageRgba8(rgba)
+        .write_to(&mut Cursor::new(&mut png_data), ImageOutputFormat::Png)
+        .map_err(|error| ComicError::DecodeError(format!("PNG 编码失败：{error}")))?;
+    Ok(EncodedPage {
+        width: image.width,
+        height: image.height,
+        png_data,
+    })
+}
+
+#[cfg(test)]
+mod encoded_page_tests {
+    use super::*;
+
+    #[test]
+    fn encodes_rgba_as_decodable_png() {
+        let encoded =
+            encode_page_png(ImageData::new(2, 1, vec![255, 0, 0, 255, 0, 255, 0, 128])).unwrap();
+
+        assert_eq!((encoded.width, encoded.height), (2, 1));
+        assert_eq!(&encoded.png_data[..8], b"\x89PNG\r\n\x1a\n");
+        let decoded = image::load_from_memory(&encoded.png_data)
+            .unwrap()
+            .to_rgba8();
+        assert_eq!(decoded.dimensions(), (2, 1));
+        assert_eq!(decoded.into_raw(), vec![255, 0, 0, 255, 0, 255, 0, 128]);
+    }
+
+    #[test]
+    fn rejects_invalid_rgba_length() {
+        let result = encode_page_png(ImageData::new(2, 2, vec![0; 4]));
+        assert!(result.is_err());
+    }
+}
+
+#[cfg(test)]
+mod raw_encoded_page_tests {
+    use super::*;
+    use image::{DynamicImage, ImageOutputFormat, RgbaImage};
+    use std::fs::File;
+    use std::io::{Cursor, Write};
+    use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use zip::write::FileOptions;
+
+    struct TempCbz(PathBuf);
+
+    impl TempCbz {
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TempCbz {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+
+    fn encode(format: ImageOutputFormat) -> Vec<u8> {
+        let pixels = RgbaImage::from_raw(2, 1, vec![255, 0, 0, 255, 0, 255, 0, 255])
+            .expect("valid RGBA fixture");
+        let mut bytes = Vec::new();
+        DynamicImage::ImageRgba8(pixels)
+            .write_to(&mut Cursor::new(&mut bytes), format)
+            .expect("encode fixture");
+        bytes
+    }
+
+    fn create_cbz(entries: &[(&str, &[u8])]) -> TempCbz {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "zephyr-raw-page-{}-{nonce}.cbz",
+            std::process::id()
+        ));
+        let file = File::create(&path).expect("create CBZ fixture");
+        let mut archive = zip::ZipWriter::new(file);
+        let options = FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        for (name, bytes) in entries {
+            archive.start_file(*name, options).expect("start ZIP entry");
+            archive.write_all(bytes).expect("write ZIP entry");
+        }
+        archive.finish().expect("finish CBZ fixture");
+        TempCbz(path)
+    }
+
+    #[test]
+    fn returns_original_jpeg_and_png_entry_bytes() {
+        let jpeg = encode(ImageOutputFormat::Jpeg(90));
+        let png = encode(ImageOutputFormat::Png);
+        let comic = create_cbz(&[("002.png", &png), ("001.jpg", &jpeg)]);
+        let path = comic.path().to_string_lossy();
+
+        assert_eq!(extract_page_image_encoded(&path, 0).unwrap(), jpeg);
+        assert_eq!(extract_page_image_encoded(&path, 1).unwrap(), png);
+    }
+
+    #[test]
+    fn rejects_out_of_range_page_without_decoding() {
+        let jpeg = encode(ImageOutputFormat::Jpeg(90));
+        let comic = create_cbz(&[("001.jpg", &jpeg)]);
+        let error = extract_page_image_encoded(&comic.path().to_string_lossy(), 1).unwrap_err();
+
+        assert!(matches!(
+            error,
+            ComicError::PageIndexOutOfBounds {
+                requested: 1,
+                total: 1
+            }
+        ));
     }
 }
 
@@ -275,8 +452,16 @@ pub async fn preload_pages(
     }
 
     let chapter = &info.chapters[0];
-    let max_w = if max_width > 0 { max_width } else { DEFAULT_MAX_WIDTH as i32 } as u32;
-    let max_h = if max_height > 0 { max_height } else { DEFAULT_MAX_HEIGHT as i32 } as u32;
+    let max_w = if max_width > 0 {
+        max_width
+    } else {
+        DEFAULT_MAX_WIDTH as i32
+    } as u32;
+    let max_h = if max_height > 0 {
+        max_height
+    } else {
+        DEFAULT_MAX_HEIGHT as i32
+    } as u32;
 
     // 收集要加载的文件名
     let file_names: Vec<String> = page_indices
@@ -354,9 +539,6 @@ pub fn set_cache_limit(max_memory_mb: i32) {
     }
 }
 
-
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -376,10 +558,22 @@ mod tests {
 
     #[test]
     fn test_is_valid_comic() {
-        // 注意：这些测试不会检查文件是否存在
-        assert!(is_valid_comic("test.cbz".to_string()));
-        assert!(!is_valid_comic("test.cbr".to_string()));
-        assert!(!is_valid_comic("test.txt".to_string()));
+        let fixture =
+            std::env::temp_dir().join(format!("zephyr-api-valid-comic-{}", std::process::id()));
+        let cbz = fixture.with_extension("cbz");
+        let cbr = fixture.with_extension("cbr");
+        let txt = fixture.with_extension("txt");
+        for path in [&cbz, &cbr, &txt] {
+            std::fs::write(path, []).expect("create comic path fixture");
+        }
+
+        assert!(is_valid_comic(cbz.to_string_lossy().into_owned()));
+        assert!(!is_valid_comic(cbr.to_string_lossy().into_owned()));
+        assert!(!is_valid_comic(txt.to_string_lossy().into_owned()));
+
+        for path in [cbz, cbr, txt] {
+            let _ = std::fs::remove_file(path);
+        }
     }
 
     #[test]
@@ -446,7 +640,8 @@ pub fn set_disk_cache_limit(max_size_mb: i32) {
 pub fn set_reading_direction(direction: ReadingDirection) {
     log::info!("设置阅读方向：{:?}", direction);
     if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mut mgr = manager.lock()
+        let mut mgr = manager
+            .lock()
             .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
             .expect("预加载管理器锁不应该中毒");
         let mut strategy = mgr.strategy().clone();
@@ -459,10 +654,12 @@ pub fn set_reading_direction(direction: ReadingDirection) {
 #[frb(sync)]
 pub fn get_reading_direction() -> ReadingDirection {
     if let Some(manager) = PRELOAD_MANAGER.get() {
-        manager.lock()
+        manager
+            .lock()
             .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
             .expect("预加载管理器锁不应该中毒")
-            .strategy().direction
+            .strategy()
+            .direction
     } else {
         ReadingDirection::LeftToRight
     }
@@ -497,10 +694,12 @@ pub fn calculate_smart_preload_pages(
     reading_speed_ms: u64,
 ) -> Vec<usize> {
     if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mgr = manager.lock()
+        let mgr = manager
+            .lock()
             .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
             .expect("预加载管理器锁不应该中毒");
-        mgr.strategy().calculate_smart_pages(current_page, total_pages, reading_speed_ms)
+        mgr.strategy()
+            .calculate_smart_pages(current_page, total_pages, reading_speed_ms)
     } else {
         let strategy = PreloadStrategy::default();
         strategy.calculate_smart_pages(current_page, total_pages, reading_speed_ms)
@@ -516,7 +715,8 @@ pub fn calculate_smart_preload_pages(
 #[frb(sync)]
 pub fn set_preload_strategy(base_count: i32, max_count: i32, enable_smart: bool) {
     if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mut mgr = manager.lock()
+        let mut mgr = manager
+            .lock()
             .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
             .expect("预加载管理器锁不应该中毒");
         let mut strategy = mgr.strategy().clone();
@@ -524,7 +724,12 @@ pub fn set_preload_strategy(base_count: i32, max_count: i32, enable_smart: bool)
         strategy.max_preload_count = max_count as usize;
         strategy.enable_smart_preload = enable_smart;
         mgr.set_strategy(strategy);
-        log::info!("设置预加载策略：base={}, max={}, smart={}", base_count, max_count, enable_smart);
+        log::info!(
+            "设置预加载策略：base={}, max={}, smart={}",
+            base_count,
+            max_count,
+            enable_smart
+        );
     }
 }
 
@@ -536,7 +741,8 @@ pub fn set_preload_strategy(base_count: i32, max_count: i32, enable_smart: bool)
 #[frb(sync)]
 pub fn get_next_page(current_page: usize, total_pages: usize) -> Option<usize> {
     if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mgr = manager.lock()
+        let mgr = manager
+            .lock()
             .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
             .expect("预加载管理器锁不应该中毒");
         mgr.strategy().next_page(current_page, total_pages)
@@ -554,7 +760,8 @@ pub fn get_next_page(current_page: usize, total_pages: usize) -> Option<usize> {
 #[frb(sync)]
 pub fn get_prev_page(current_page: usize, total_pages: usize) -> Option<usize> {
     if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mgr = manager.lock()
+        let mgr = manager
+            .lock()
             .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
             .expect("预加载管理器锁不应该中毒");
         mgr.strategy().prev_page(current_page, total_pages)
@@ -569,7 +776,8 @@ pub fn get_prev_page(current_page: usize, total_pages: usize) -> Option<usize> {
 pub fn cancel_all_preload_tasks() {
     log::info!("取消所有预加载任务");
     if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mut mgr = manager.lock()
+        let mut mgr = manager
+            .lock()
             .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
             .expect("预加载管理器锁不应该中毒");
         mgr.cancel_all();
@@ -584,7 +792,8 @@ pub fn cancel_all_preload_tasks() {
 pub fn cancel_preload_tasks_for_file(file_path: String) {
     log::info!("取消文件预加载任务：{}", file_path);
     if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mut mgr = manager.lock()
+        let mut mgr = manager
+            .lock()
             .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
             .expect("预加载管理器锁不应该中毒");
         mgr.cancel_for_file(&file_path);
@@ -595,7 +804,8 @@ pub fn cancel_preload_tasks_for_file(file_path: String) {
 #[frb(sync)]
 pub fn get_pending_preload_tasks() -> usize {
     if let Some(manager) = PRELOAD_MANAGER.get() {
-        manager.lock()
+        manager
+            .lock()
             .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
             .expect("预加载管理器锁不应该中毒")
             .pending_count()
@@ -613,7 +823,8 @@ pub fn get_pending_preload_tasks() -> usize {
 #[frb(sync)]
 pub fn save_reading_progress(progress: ReadingProgress) -> Result<()> {
     if let Some(db) = get_global_db() {
-        let db_guard = db.lock()
+        let db_guard = db
+            .lock()
             .map_err(|e| ComicError::Internal(format!("数据库锁中毒：{}", e)))?;
         db_guard.save_reading_progress(&progress)
     } else {
@@ -662,6 +873,19 @@ pub fn get_reading_history(limit: i32) -> Vec<ReadingProgress> {
     }
 }
 
+/// Hide one history entry without deleting its progress or bookmarks.
+#[frb(sync)]
+pub fn hide_reading_history(file_path: String) -> Result<()> {
+    if let Some(db) = get_global_db() {
+        let db_guard = db
+            .lock()
+            .map_err(|e| ComicError::Internal(format!("数据库锁中毒：{}", e)))?;
+        db_guard.hide_reading_history(&file_path)
+    } else {
+        Err(ComicError::Internal("数据库未初始化".to_string()))
+    }
+}
+
 /// 删除阅读进度
 ///
 /// # 参数
@@ -669,7 +893,8 @@ pub fn get_reading_history(limit: i32) -> Vec<ReadingProgress> {
 #[frb(sync)]
 pub fn remove_reading_progress(file_path: String) -> Result<()> {
     if let Some(db) = get_global_db() {
-        let db_guard = db.lock()
+        let db_guard = db
+            .lock()
             .map_err(|e| ComicError::Internal(format!("数据库锁中毒：{}", e)))?;
         db_guard.remove_reading_progress(&file_path)
     } else {
@@ -690,7 +915,8 @@ pub fn add_bookmark(file_path: String, page_index: i32, note: Option<String>) ->
     let bookmark = Bookmark::new(file_path, page_index as usize, note);
 
     if let Some(db) = get_global_db() {
-        let db_guard = db.lock()
+        let db_guard = db
+            .lock()
             .map_err(|e| ComicError::Internal(format!("数据库锁中毒：{}", e)))?;
         db_guard.add_bookmark(&bookmark)?;
         Ok(bookmark)
@@ -707,7 +933,8 @@ pub fn add_bookmark(file_path: String, page_index: i32, note: Option<String>) ->
 #[frb(sync)]
 pub fn remove_bookmark(file_path: String, page_index: i32) -> Result<()> {
     if let Some(db) = get_global_db() {
-        let db_guard = db.lock()
+        let db_guard = db
+            .lock()
             .map_err(|e| ComicError::Internal(format!("数据库锁中毒：{}", e)))?;
         db_guard.remove_bookmark(&file_path, page_index as usize)
     } else {
@@ -787,7 +1014,8 @@ pub fn extract_comic_metadata(file_path: String) -> Result<ComicMetadata> {
 #[frb(sync)]
 pub fn scan_directory_to_library(path: String) -> Result<Vec<LibraryEntry>> {
     if let Some(db) = get_global_db() {
-        let db_guard = db.lock()
+        let db_guard = db
+            .lock()
             .map_err(|e| ComicError::Internal(format!("数据库锁中毒：{}", e)))?;
         crate::library_scanner::scan_directory_to_library(&db_guard, &path)
     } else {
@@ -859,7 +1087,8 @@ pub fn get_recently_added(limit: i32) -> Vec<LibraryEntry> {
 #[frb(sync)]
 pub fn remove_from_library(file_path: String) -> Result<()> {
     if let Some(db) = get_global_db() {
-        let db_guard = db.lock()
+        let db_guard = db
+            .lock()
             .map_err(|e| ComicError::Internal(format!("数据库锁中毒：{}", e)))?;
         db_guard.remove_from_library(&file_path)
     } else {
@@ -874,7 +1103,8 @@ pub fn remove_from_library(file_path: String) -> Result<()> {
 #[frb(sync)]
 pub fn update_last_opened(file_path: String) -> Result<()> {
     if let Some(db) = get_global_db() {
-        let db_guard = db.lock()
+        let db_guard = db
+            .lock()
             .map_err(|e| ComicError::Internal(format!("数据库锁中毒：{}", e)))?;
         db_guard.update_last_opened(&file_path)
     } else {
@@ -901,12 +1131,25 @@ mod testsaa {
 
     #[test]
     fn test_is_valid_comic() {
-        // 注意：这些测试不会检查文件是否存在
-        assert!(is_valid_comic("test.cbz".to_string()));
-        assert!(!is_valid_comic("test.cbr".to_string()));
-        assert!(!is_valid_comic("test.txt".to_string()));
-    }
+        let fixture = std::env::temp_dir().join(format!(
+            "zephyr-api-legacy-valid-comic-{}",
+            std::process::id()
+        ));
+        let cbz = fixture.with_extension("cbz");
+        let cbr = fixture.with_extension("cbr");
+        let txt = fixture.with_extension("txt");
+        for path in [&cbz, &cbr, &txt] {
+            std::fs::write(path, []).expect("create comic path fixture");
+        }
 
+        assert!(is_valid_comic(cbz.to_string_lossy().into_owned()));
+        assert!(!is_valid_comic(cbr.to_string_lossy().into_owned()));
+        assert!(!is_valid_comic(txt.to_string_lossy().into_owned()));
+
+        for path in [cbz, cbr, txt] {
+            let _ = std::fs::remove_file(path);
+        }
+    }
 
     #[test]
     fn test_disk_cache_stats() {

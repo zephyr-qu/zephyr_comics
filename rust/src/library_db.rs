@@ -2,13 +2,12 @@
 //!
 //! 使用 SQLite 存储阅读进度、书签和漫画库信息。
 
-use flutter_rust_bridge::frb;
-use rusqlite::{Connection, params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::error::{ComicError, Result};
-use crate::reading_progress::{ReadingProgress, Bookmark, ReadingStats, current_timestamp};
+use crate::reading_progress::{current_timestamp, Bookmark, ReadingProgress, ReadingStats};
 
 /// 数据库包装器
 pub struct LibraryDatabase {
@@ -33,8 +32,7 @@ impl LibraryDatabase {
             let _ = std::fs::create_dir_all(parent);
         }
 
-        let conn = Connection::open(&path)
-            .map_err(|e| db_err("无法打开数据库", e))?;
+        let conn = Connection::open(&path).map_err(|e| db_err("无法打开数据库", e))?;
 
         let db = Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -56,10 +54,31 @@ impl LibraryDatabase {
                 chapter_index INTEGER NOT NULL DEFAULT 0,
                 page_index INTEGER NOT NULL DEFAULT 0,
                 last_read_timestamp INTEGER NOT NULL,
-                completion_percent REAL NOT NULL DEFAULT 0.0
+                completion_percent REAL NOT NULL DEFAULT 0.0,
+                history_visible INTEGER NOT NULL DEFAULT 1
             )",
             [],
-        ).map_err(|e| db_err("创建表失败", e))?;
+        )
+        .map_err(|e| db_err("创建表失败", e))?;
+
+        // Forward migration for databases created before history visibility
+        // was separated from progress. Never delete or recreate user data.
+        let _ = conn.execute(
+            "ALTER TABLE reading_progress ADD COLUMN history_visible INTEGER NOT NULL DEFAULT 1",
+            [],
+        );
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, version INTEGER NOT NULL)",
+            [],
+        )
+        .map_err(|e| db_err("创建 schema 版本表失败", e))?;
+        conn.execute(
+            "INSERT INTO schema_meta(key, version) VALUES ('library', 2)
+             ON CONFLICT(key) DO UPDATE SET version = MAX(version, excluded.version)",
+            [],
+        )
+        .map_err(|e| db_err("写入 schema 版本失败", e))?;
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS bookmarks (
@@ -71,7 +90,8 @@ impl LibraryDatabase {
                 UNIQUE(file_path, page_index)
             )",
             [],
-        ).map_err(|e| db_err("创建表失败", e))?;
+        )
+        .map_err(|e| db_err("创建表失败", e))?;
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS library (
@@ -88,25 +108,37 @@ impl LibraryDatabase {
                 total_pages INTEGER,
                 cover_data BLOB,
                 added_at INTEGER NOT NULL,
-                last_opened_at INTEGER
+                last_opened_at INTEGER,
+                modified_at INTEGER NOT NULL DEFAULT 0
             )",
             [],
-        ).map_err(|e| db_err("创建表失败", e))?;
+        )
+        .map_err(|e| db_err("创建表失败", e))?;
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_library_title ON library(title)",
             [],
-        ).map_err(|e| db_err("创建索引失败", e))?;
+        )
+        .map_err(|e| db_err("创建索引失败", e))?;
+
+        // Existing MVP databases predate the scanner fingerprint. Keep them
+        // readable and let the next successful scan populate the value.
+        let _ = conn.execute(
+            "ALTER TABLE library ADD COLUMN modified_at INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_library_added ON library(added_at)",
             [],
-        ).map_err(|e| db_err("创建索引失败", e))?;
+        )
+        .map_err(|e| db_err("创建索引失败", e))?;
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_bookmarks_file ON bookmarks(file_path)",
             [],
-        ).map_err(|e| db_err("创建索引失败", e))?;
+        )
+        .map_err(|e| db_err("创建索引失败", e))?;
 
         Ok(())
     }
@@ -126,7 +158,8 @@ impl LibraryDatabase {
                 progress.last_read_timestamp,
                 progress.completion_percent,
             ],
-        ).map_err(|e| db_err("保存进度失败", e))?;
+        )
+        .map_err(|e| db_err("保存进度失败", e))?;
 
         Ok(())
     }
@@ -162,18 +195,22 @@ impl LibraryDatabase {
 
         let mut stmt = conn.prepare(
             "SELECT file_path, chapter_index, page_index, last_read_timestamp, completion_percent
-             FROM reading_progress ORDER BY last_read_timestamp DESC LIMIT ?1",
+             FROM reading_progress
+             WHERE history_visible = 1
+             ORDER BY last_read_timestamp DESC LIMIT ?1",
         ).map_err(|e| db_err("准备语句失败", e))?;
 
-        let progress_iter = stmt.query_map(params![limit], |row| {
-            Ok(ReadingProgress {
-                file_path: row.get(0)?,
-                chapter_index: row.get(1)?,
-                page_index: row.get(2)?,
-                last_read_timestamp: row.get(3)?,
-                completion_percent: row.get(4)?,
+        let progress_iter = stmt
+            .query_map(params![limit], |row| {
+                Ok(ReadingProgress {
+                    file_path: row.get(0)?,
+                    chapter_index: row.get(1)?,
+                    page_index: row.get(2)?,
+                    last_read_timestamp: row.get(3)?,
+                    completion_percent: row.get(4)?,
+                })
             })
-        }).map_err(|e| db_err("查询失败", e))?;
+            .map_err(|e| db_err("查询失败", e))?;
 
         let mut progress_list = Vec::new();
         for progress in progress_iter {
@@ -183,6 +220,17 @@ impl LibraryDatabase {
         Ok(progress_list)
     }
 
+    /// Hide a history entry while preserving progress and bookmarks.
+    pub fn hide_reading_history(&self, file_path: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE reading_progress SET history_visible = 0 WHERE file_path = ?1",
+            params![file_path],
+        )
+        .map_err(|e| db_err("删除历史失败", e))?;
+        Ok(())
+    }
+
     /// 删除阅读进度
     pub fn remove_reading_progress(&self, file_path: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
@@ -190,7 +238,8 @@ impl LibraryDatabase {
         conn.execute(
             "DELETE FROM reading_progress WHERE file_path = ?1",
             params![file_path],
-        ).map_err(|e| db_err("删除失败", e))?;
+        )
+        .map_err(|e| db_err("删除失败", e))?;
 
         Ok(())
     }
@@ -208,7 +257,8 @@ impl LibraryDatabase {
                 bookmark.note,
                 bookmark.created_at,
             ],
-        ).map_err(|e| db_err("添加书签失败", e))?;
+        )
+        .map_err(|e| db_err("添加书签失败", e))?;
 
         Ok(())
     }
@@ -220,7 +270,8 @@ impl LibraryDatabase {
         conn.execute(
             "DELETE FROM bookmarks WHERE file_path = ?1 AND page_index = ?2",
             params![file_path, page_index],
-        ).map_err(|e| db_err("删除书签失败", e))?;
+        )
+        .map_err(|e| db_err("删除书签失败", e))?;
 
         Ok(())
     }
@@ -229,19 +280,23 @@ impl LibraryDatabase {
     pub fn get_bookmarks(&self, file_path: &str) -> Result<Vec<Bookmark>> {
         let conn = self.conn.lock().unwrap();
 
-        let mut stmt = conn.prepare(
-            "SELECT file_path, page_index, note, created_at
+        let mut stmt = conn
+            .prepare(
+                "SELECT file_path, page_index, note, created_at
              FROM bookmarks WHERE file_path = ?1 ORDER BY page_index ASC",
-        ).map_err(|e| db_err("准备语句失败", e))?;
+            )
+            .map_err(|e| db_err("准备语句失败", e))?;
 
-        let bookmark_iter = stmt.query_map(params![file_path], |row| {
-            Ok(Bookmark {
-                file_path: row.get(0)?,
-                page_index: row.get(1)?,
-                note: row.get(2)?,
-                created_at: row.get(3)?,
+        let bookmark_iter = stmt
+            .query_map(params![file_path], |row| {
+                Ok(Bookmark {
+                    file_path: row.get(0)?,
+                    page_index: row.get(1)?,
+                    note: row.get(2)?,
+                    created_at: row.get(3)?,
+                })
             })
-        }).map_err(|e| db_err("查询失败", e))?;
+            .map_err(|e| db_err("查询失败", e))?;
 
         let mut bookmarks = Vec::new();
         for bookmark in bookmark_iter {
@@ -255,19 +310,23 @@ impl LibraryDatabase {
     pub fn get_all_bookmarks(&self) -> Result<Vec<Bookmark>> {
         let conn = self.conn.lock().unwrap();
 
-        let mut stmt = conn.prepare(
-            "SELECT file_path, page_index, note, created_at
+        let mut stmt = conn
+            .prepare(
+                "SELECT file_path, page_index, note, created_at
              FROM bookmarks ORDER BY created_at DESC",
-        ).map_err(|e| db_err("准备语句失败", e))?;
+            )
+            .map_err(|e| db_err("准备语句失败", e))?;
 
-        let bookmark_iter = stmt.query_map([], |row| {
-            Ok(Bookmark {
-                file_path: row.get(0)?,
-                page_index: row.get(1)?,
-                note: row.get(2)?,
-                created_at: row.get(3)?,
+        let bookmark_iter = stmt
+            .query_map([], |row| {
+                Ok(Bookmark {
+                    file_path: row.get(0)?,
+                    page_index: row.get(1)?,
+                    note: row.get(2)?,
+                    created_at: row.get(3)?,
+                })
             })
-        }).map_err(|e| db_err("查询失败", e))?;
+            .map_err(|e| db_err("查询失败", e))?;
 
         let mut bookmarks = Vec::new();
         for bookmark in bookmark_iter {
@@ -281,17 +340,21 @@ impl LibraryDatabase {
     pub fn get_reading_stats(&self) -> Result<ReadingStats> {
         let conn = self.conn.lock().unwrap();
 
-        let total_comics: usize = conn.query_row(
-            "SELECT COUNT(*) FROM reading_progress WHERE completion_percent >= 99.0",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let total_comics: usize = conn
+            .query_row(
+                "SELECT COUNT(*) FROM reading_progress WHERE completion_percent >= 99.0",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
-        let total_pages: usize = conn.query_row(
-            "SELECT COALESCE(SUM(page_index), 0) FROM reading_progress",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let total_pages: usize = conn
+            .query_row(
+                "SELECT COALESCE(SUM(page_index), 0) FROM reading_progress",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         Ok(ReadingStats {
             total_comics_read: total_comics,
@@ -304,12 +367,30 @@ impl LibraryDatabase {
     /// 添加漫画到库
     pub fn add_to_library(&self, entry: &LibraryEntry) -> Result<()> {
         let conn = self.conn.lock().unwrap();
+        let modified_at = std::fs::metadata(&entry.file_path)
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|duration| duration.as_nanos() as u64)
+            .unwrap_or_default();
 
         conn.execute(
-            "INSERT OR REPLACE INTO library 
+            "INSERT INTO library
              (file_path, title, author, publisher, description, genres, year, 
-              format, file_size, total_pages, cover_data, added_at, last_opened_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+              format, file_size, total_pages, cover_data, added_at, last_opened_at, modified_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+             ON CONFLICT(file_path) DO UPDATE SET
+               title = excluded.title,
+               author = excluded.author,
+               publisher = excluded.publisher,
+               description = excluded.description,
+               genres = excluded.genres,
+               year = excluded.year,
+               format = excluded.format,
+               file_size = excluded.file_size,
+               total_pages = excluded.total_pages,
+               cover_data = excluded.cover_data,
+               modified_at = excluded.modified_at",
             params![
                 entry.file_path,
                 entry.title,
@@ -324,10 +405,26 @@ impl LibraryDatabase {
                 entry.cover_data,
                 entry.added_at,
                 entry.last_opened_at,
+                modified_at,
             ],
-        ).map_err(|e| db_err("添加到图书馆失败", e))?;
+        )
+        .map_err(|e| db_err("添加到图书馆失败", e))?;
 
         Ok(())
+    }
+
+    /// Return the persisted size/mtime fingerprint used by incremental scans.
+    /// This remains an implementation seam and is intentionally not exposed
+    /// through the generated Flutter `LibraryEntry` shape.
+    pub fn get_file_fingerprint(&self, file_path: &str) -> Result<Option<(u64, u64)>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT file_size, modified_at FROM library WHERE file_path = ?1",
+            params![file_path],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(|e| db_err("查询文件指纹失败", e))
     }
 
     /// 从库中移除
@@ -337,7 +434,8 @@ impl LibraryDatabase {
         conn.execute(
             "DELETE FROM library WHERE file_path = ?1",
             params![file_path],
-        ).map_err(|e| db_err("删除失败", e))?;
+        )
+        .map_err(|e| db_err("删除失败", e))?;
 
         Ok(())
     }
@@ -346,29 +444,37 @@ impl LibraryDatabase {
     pub fn get_library_entries(&self) -> Result<Vec<LibraryEntry>> {
         let conn = self.conn.lock().unwrap();
 
-        let mut stmt = conn.prepare(
-            "SELECT file_path, title, author, publisher, description, genres, year,
+        let mut stmt = conn
+            .prepare(
+                "SELECT file_path, title, author, publisher, description, genres, year,
                     format, file_size, total_pages, cover_data, added_at, last_opened_at
              FROM library ORDER BY added_at DESC",
-        ).map_err(|e| db_err("准备语句失败", e))?;
+            )
+            .map_err(|e| db_err("准备语句失败", e))?;
 
-        let iter = stmt.query_map([], |row| {
-            Ok(LibraryEntry {
-                file_path: row.get(0)?,
-                title: row.get(1)?,
-                author: row.get(2)?,
-                publisher: row.get(3)?,
-                description: row.get(4)?,
-                genres: row.get::<_, String>(5)?.split(',').map(|s| s.to_string()).collect(),
-                year: row.get(6)?,
-                format: row.get(7)?,
-                file_size: row.get(8)?,
-                total_pages: row.get(9)?,
-                cover_data: row.get(10)?,
-                added_at: row.get(11)?,
-                last_opened_at: row.get(12)?,
+        let iter = stmt
+            .query_map([], |row| {
+                Ok(LibraryEntry {
+                    file_path: row.get(0)?,
+                    title: row.get(1)?,
+                    author: row.get(2)?,
+                    publisher: row.get(3)?,
+                    description: row.get(4)?,
+                    genres: row
+                        .get::<_, String>(5)?
+                        .split(',')
+                        .map(|s| s.to_string())
+                        .collect(),
+                    year: row.get(6)?,
+                    format: row.get(7)?,
+                    file_size: row.get(8)?,
+                    total_pages: row.get(9)?,
+                    cover_data: row.get(10)?,
+                    added_at: row.get(11)?,
+                    last_opened_at: row.get(12)?,
+                })
             })
-        }).map_err(|e| db_err("查询失败", e))?;
+            .map_err(|e| db_err("查询失败", e))?;
 
         let mut entries = Vec::new();
         for entry in iter {
@@ -383,31 +489,39 @@ impl LibraryDatabase {
         let conn = self.conn.lock().unwrap();
         let search_pattern = format!("%{}%", query);
 
-        let mut stmt = conn.prepare(
-            "SELECT file_path, title, author, publisher, description, genres, year,
+        let mut stmt = conn
+            .prepare(
+                "SELECT file_path, title, author, publisher, description, genres, year,
                     format, file_size, total_pages, cover_data, added_at, last_opened_at
              FROM library
              WHERE title LIKE ?1 OR author LIKE ?1 OR description LIKE ?1
              ORDER BY title ASC",
-        ).map_err(|e| db_err("准备语句失败", e))?;
+            )
+            .map_err(|e| db_err("准备语句失败", e))?;
 
-        let iter = stmt.query_map(params![search_pattern], |row| {
-            Ok(LibraryEntry {
-                file_path: row.get(0)?,
-                title: row.get(1)?,
-                author: row.get(2)?,
-                publisher: row.get(3)?,
-                description: row.get(4)?,
-                genres: row.get::<_, String>(5)?.split(',').map(|s| s.to_string()).collect(),
-                year: row.get(6)?,
-                format: row.get(7)?,
-                file_size: row.get(8)?,
-                total_pages: row.get(9)?,
-                cover_data: row.get(10)?,
-                added_at: row.get(11)?,
-                last_opened_at: row.get(12)?,
+        let iter = stmt
+            .query_map(params![search_pattern], |row| {
+                Ok(LibraryEntry {
+                    file_path: row.get(0)?,
+                    title: row.get(1)?,
+                    author: row.get(2)?,
+                    publisher: row.get(3)?,
+                    description: row.get(4)?,
+                    genres: row
+                        .get::<_, String>(5)?
+                        .split(',')
+                        .map(|s| s.to_string())
+                        .collect(),
+                    year: row.get(6)?,
+                    format: row.get(7)?,
+                    file_size: row.get(8)?,
+                    total_pages: row.get(9)?,
+                    cover_data: row.get(10)?,
+                    added_at: row.get(11)?,
+                    last_opened_at: row.get(12)?,
+                })
             })
-        }).map_err(|e| db_err("查询失败", e))?;
+            .map_err(|e| db_err("查询失败", e))?;
 
         let mut entries = Vec::new();
         for entry in iter {
@@ -421,29 +535,37 @@ impl LibraryDatabase {
     pub fn get_recently_added(&self, limit: usize) -> Result<Vec<LibraryEntry>> {
         let conn = self.conn.lock().unwrap();
 
-        let mut stmt = conn.prepare(
-            "SELECT file_path, title, author, publisher, description, genres, year,
+        let mut stmt = conn
+            .prepare(
+                "SELECT file_path, title, author, publisher, description, genres, year,
                     format, file_size, total_pages, cover_data, added_at, last_opened_at
              FROM library ORDER BY added_at DESC LIMIT ?1",
-        ).map_err(|e| db_err("准备语句失败", e))?;
+            )
+            .map_err(|e| db_err("准备语句失败", e))?;
 
-        let iter = stmt.query_map(params![limit], |row| {
-            Ok(LibraryEntry {
-                file_path: row.get(0)?,
-                title: row.get(1)?,
-                author: row.get(2)?,
-                publisher: row.get(3)?,
-                description: row.get(4)?,
-                genres: row.get::<_, String>(5)?.split(',').map(|s| s.to_string()).collect(),
-                year: row.get(6)?,
-                format: row.get(7)?,
-                file_size: row.get(8)?,
-                total_pages: row.get(9)?,
-                cover_data: row.get(10)?,
-                added_at: row.get(11)?,
-                last_opened_at: row.get(12)?,
+        let iter = stmt
+            .query_map(params![limit], |row| {
+                Ok(LibraryEntry {
+                    file_path: row.get(0)?,
+                    title: row.get(1)?,
+                    author: row.get(2)?,
+                    publisher: row.get(3)?,
+                    description: row.get(4)?,
+                    genres: row
+                        .get::<_, String>(5)?
+                        .split(',')
+                        .map(|s| s.to_string())
+                        .collect(),
+                    year: row.get(6)?,
+                    format: row.get(7)?,
+                    file_size: row.get(8)?,
+                    total_pages: row.get(9)?,
+                    cover_data: row.get(10)?,
+                    added_at: row.get(11)?,
+                    last_opened_at: row.get(12)?,
+                })
             })
-        }).map_err(|e| db_err("查询失败", e))?;
+            .map_err(|e| db_err("查询失败", e))?;
 
         let mut entries = Vec::new();
         for entry in iter {
@@ -461,7 +583,8 @@ impl LibraryDatabase {
         conn.execute(
             "UPDATE library SET last_opened_at = ?1 WHERE file_path = ?2",
             params![now, file_path],
-        ).map_err(|e| db_err("更新失败", e))?;
+        )
+        .map_err(|e| db_err("更新失败", e))?;
 
         Ok(())
     }
@@ -510,7 +633,10 @@ mod tests {
 
     fn create_test_db() -> LibraryDatabase {
         let mut path = std::env::temp_dir();
-        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
         path.push(format!("zephyr_test_{}.db", ts));
         LibraryDatabase::new(Some(path)).unwrap()
     }
@@ -534,5 +660,42 @@ mod tests {
         db.remove_bookmark("test.cbz", 5).unwrap();
         let bookmarks = db.get_bookmarks("test.cbz").unwrap();
         assert!(bookmarks.is_empty());
+    }
+
+    #[test]
+    fn library_upsert_preserves_existing_timestamps() {
+        let db = create_test_db();
+        let original = LibraryEntry {
+            file_path: "stable.cbz".to_string(),
+            title: Some("Old title".to_string()),
+            author: None,
+            publisher: None,
+            description: None,
+            genres: vec![],
+            year: None,
+            format: "cbz".to_string(),
+            file_size: 10,
+            total_pages: 1,
+            cover_data: None,
+            added_at: 100,
+            last_opened_at: Some(200),
+        };
+        db.add_to_library(&original).unwrap();
+
+        let refreshed = LibraryEntry {
+            title: Some("New title".to_string()),
+            file_size: 20,
+            total_pages: 2,
+            added_at: 300,
+            last_opened_at: None,
+            ..original
+        };
+        db.add_to_library(&refreshed).unwrap();
+
+        let stored = db.get_library_entries().unwrap().remove(0);
+        assert_eq!(stored.title.as_deref(), Some("New title"));
+        assert_eq!(stored.file_size, 20);
+        assert_eq!(stored.added_at, 100);
+        assert_eq!(stored.last_opened_at, Some(200));
     }
 }

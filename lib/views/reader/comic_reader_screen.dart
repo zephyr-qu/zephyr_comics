@@ -1,359 +1,394 @@
-import 'dart:io';
+import 'dart:async';
+
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+
 import '../../models/reader_mode.dart';
+import '../../reader/frb_reader_engine.dart';
+import '../../reader/reader_engine.dart';
+import '../../reader/reader_session.dart';
 import '../../signals/app_signals.dart';
-import 'image_view_horizontal.dart';
-import 'image_view_vertical.dart';
 
 class ComicReaderScreen extends StatefulWidget {
+  const ComicReaderScreen({
+    super.key,
+    required this.filePath,
+    this.readerEngine,
+  });
   final String filePath;
-  const ComicReaderScreen({super.key, required this.filePath});
+  final ReaderEngine? readerEngine;
 
   @override
   State<ComicReaderScreen> createState() => _ComicReaderScreenState();
 }
 
-class _ComicReaderScreenState extends State<ComicReaderScreen>
-    with TickerProviderStateMixin {
-  // ponytail: demo data - real data comes from Rust FRB
-  final int _totalPages = 30;
-  int _currentPage = 0;
-  ReaderMode _readerMode = ReaderMode.vertical;
-  bool _isToolbarVisible = false;
-  final bool _showPageNumbers = true;
-
+class _ComicReaderScreenState extends State<ComicReaderScreen> {
+  late final ReaderSession _session;
   late final ItemScrollController _itemScrollController;
-  late final ExtendedPageController _extPageController;
+  late final ItemPositionsListener _positionsListener;
+  ExtendedPageController? _pageController;
+  ReaderMode _readerMode = ReaderMode.vertical;
+  bool _toolbarVisible = false;
+  final Set<int> _failedPages = <int>{};
 
   @override
   void initState() {
     super.initState();
+    _session = ReaderSession(
+      filePath: widget.filePath,
+      engine: widget.readerEngine ?? FrbReaderEngine(),
+    );
     _itemScrollController = ItemScrollController();
-    _extPageController = ExtendedPageController(
-      initialPage: _currentPage,
-      shouldIgnorePointerWhenScrolling: false,
-    );
+    _positionsListener = ItemPositionsListener.create()
+      ..itemPositions.addListener(_onContinuousPosition);
     _readerMode = readerMode.value;
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.immersiveSticky,
-      overlays: [],
-    );
+    _enterFullscreen();
+    _session.open();
   }
 
   @override
   void dispose() {
-    _extPageController.dispose();
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: SystemUiOverlay.values,
-    );
+    _positionsListener.itemPositions.removeListener(_onContinuousPosition);
+    _pageController?.dispose();
+    _session.close();
+    _exitFullscreen();
     super.dispose();
   }
 
-  bool get _isContinuous =>
+  bool get _continuous =>
       _readerMode == ReaderMode.verticalContinuous ||
       _readerMode == ReaderMode.webtoon;
 
-  Axis get _scrollAxis =>
-      _readerMode == ReaderMode.vertical ? Axis.vertical : Axis.horizontal;
-
-  bool get _isReversed => _readerMode == ReaderMode.rtl;
-
-  String _cachePath(int page) {
-    final dir = Directory('${Directory.systemTemp.path}/zephyr_cache');
-    dir.createSync(recursive: true);
-    return '${dir.path}/page_$page.jpg';
+  void _onContinuousPosition() {
+    if (!_continuous) return;
+    final visible =
+        _positionsListener.itemPositions.value
+            .where(
+              (item) => item.itemTrailingEdge > 0 && item.itemLeadingEdge < 1,
+            )
+            .toList()
+          ..sort((a, b) => a.itemLeadingEdge.compareTo(b.itemLeadingEdge));
+    if (visible.isNotEmpty) _session.moveTo(visible.first.index);
   }
 
-  void _goToPage(int page) {
-    final clamped = page.clamp(0, _totalPages - 1);
-    if (_isContinuous) {
-      _itemScrollController.scrollTo(
-        index: clamped,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.ease,
-      );
-    } else {
-      _extPageController.animateToPage(
-        clamped,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.ease,
-      );
-    }
-    _currentPage = clamped;
-  }
-
-  void _toggleToolbar() {
-    setState(() => _isToolbarVisible = !_isToolbarVisible);
-    if (_isToolbarVisible) {
-      SystemChrome.setEnabledSystemUIMode(
-        SystemUiMode.manual,
-        overlays: SystemUiOverlay.values,
-      );
-    } else {
-      SystemChrome.setEnabledSystemUIMode(
-        SystemUiMode.immersiveSticky,
-        overlays: [],
-      );
-    }
-  }
+  void _enterFullscreen() =>
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  void _exitFullscreen() => SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.manual,
+    overlays: SystemUiOverlay.values,
+  );
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          SystemChrome.setEnabledSystemUIMode(
-            SystemUiMode.manual,
-            overlays: SystemUiOverlay.values,
-          );
-        }
+    return ValueListenableBuilder<ReaderSnapshot>(
+      valueListenable: _session.snapshot,
+      builder: (context, snapshot, _) {
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: switch (snapshot) {
+            ReaderOpening() => const Center(child: CircularProgressIndicator()),
+            ReaderFailed(:final failure) => _fatal(failure),
+            ReaderReady() => _ready(snapshot),
+          },
+        );
       },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: Stack(
-          children: [
-            _buildContent(),
-            _buildGestureOverlay(),
-            _buildToolbar(),
-            _buildPageNumber(),
-          ],
-        ),
-      ),
     );
   }
 
-  Widget _buildContent() {
-    if (_isContinuous) {
-      return ScrollablePositionedList.separated(
-        physics: const ClampingScrollPhysics(),
-        minCacheExtent: 8 * MediaQuery.of(context).size.height,
-        initialScrollIndex: _currentPage,
-        itemCount: _totalPages,
-        itemScrollController: _itemScrollController,
-        itemBuilder: (context, index) {
-          return GestureDetector(
-            onDoubleTapDown: (details) {},
-            child: ImageViewVertical(
-              cachePath: _cachePath(index),
-              chapter: '',
-              index: index,
-              length: _totalPages,
-            ),
-          );
-        },
-        separatorBuilder: (_, _) => Divider(
-          color: Colors.black,
-          height: _readerMode == ReaderMode.webtoon ? 0 : 6,
+  Widget _fatal(ReaderFailure failure) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.error_outline, color: Colors.white, size: 56),
+        const SizedBox(height: 12),
+        Text(failure.message, style: const TextStyle(color: Colors.white)),
+        FilledButton(
+          key: const Key('reader-fatal-retry'),
+          onPressed: _session.open,
+          child: const Text('重试'),
         ),
-      );
-    }
+      ],
+    ),
+  );
 
-    return ExtendedImageGesturePageView.builder(
-      controller: _extPageController,
-      scrollDirection: _scrollAxis,
-      reverse: _isReversed,
-      physics: const ClampingScrollPhysics(),
-      canScrollPage: (details) {
-        return details == null || !(details.totalScale! > 1.0);
-      },
-      itemBuilder: (context, index) {
-        return ImageViewHorizontal(
-          cachePath: _cachePath(index),
-          chapter: '',
-          index: index,
-          length: _totalPages,
-          loadStateChanged: (state) => _buildLoadState(state),
-          onDoubleTap: (state) {
-            final begin = state.gestureDetails?.totalScale ?? 1.0;
-            state.handleDoubleTap(
-              scale: begin == 1.0 ? 2.0 : 1.0,
-              doubleTapPosition: state.pointerDownPosition,
-            );
-          },
-          initGestureConfigHandler: (state) {
-            return GestureConfig(
-              inertialSpeed: 200,
-              inPageView: true,
-              initialScale: 1.0,
-              maxScale: 8,
-              animationMaxScale: 8,
-              initialAlignment: InitialAlignment.center,
-              cacheGesture: false,
-              hitTestBehavior: HitTestBehavior.translucent,
+  Widget _ready(ReaderReady ready) {
+    _pageController ??= ExtendedPageController(
+      initialPage: ready.currentPage,
+      shouldIgnorePointerWhenScrolling: false,
+    );
+    return Stack(
+      children: [
+        if (_continuous)
+          ScrollablePositionedList.separated(
+            initialScrollIndex: ready.currentPage,
+            itemCount: ready.totalPages,
+            minCacheExtent: MediaQuery.sizeOf(context).height * 3,
+            itemScrollController: _itemScrollController,
+            itemPositionsListener: _positionsListener,
+            itemBuilder: (_, index) => _page(index, gesture: false),
+            separatorBuilder: (_, _) =>
+                SizedBox(height: _readerMode == ReaderMode.webtoon ? 0 : 6),
+          )
+        else
+          ExtendedImageGesturePageView.builder(
+            controller: _pageController,
+            scrollDirection: _readerMode == ReaderMode.vertical
+                ? Axis.vertical
+                : Axis.horizontal,
+            reverse: _readerMode == ReaderMode.rtl,
+            itemCount: ready.totalPages,
+            itemBuilder: (_, index) => _page(index, gesture: true),
+            onPageChanged: _session.moveTo,
+          ),
+        _gestureOverlay(ready),
+        _toolbar(ready),
+        if (ready.warning case final warning?)
+          Positioned(
+            top: 96,
+            left: 16,
+            right: 16,
+            child: Material(
+              color: Colors.amber.shade800,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  warning.message,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+        if (!_toolbarVisible)
+          Positioned(
+            bottom: 24,
+            left: 0,
+            right: 0,
+            child: Text(
+              '${ready.currentPage + 1} / ${ready.totalPages}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _page(int index, {required bool gesture}) {
+    final mediaQuery = MediaQuery.of(context);
+    final cacheWidth = (mediaQuery.size.width * mediaQuery.devicePixelRatio)
+        .ceil()
+        .clamp(1, 1 << 30)
+        .toInt();
+    final cacheHeight = (mediaQuery.size.height * mediaQuery.devicePixelRatio)
+        .ceil()
+        .clamp(1, 1 << 30)
+        .toInt();
+    return FutureBuilder<ReaderPage>(
+      future: _session.loadPage(index),
+      builder: (context, result) {
+        if (result.hasError) {
+          _markPageFailure(index, failed: true);
+          return _pageRetry(index);
+        }
+        final page = result.data;
+        if (page == null) {
+          return SizedBox(
+            height: MediaQuery.sizeOf(context).height,
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        final imageProvider = ExtendedResizeImage(
+          ExtendedMemoryImageProvider(page.encodedBytes),
+          width: cacheWidth,
+          height: cacheHeight,
+          policy: ResizeImagePolicy.fit,
+        );
+        return ExtendedImage(
+          image: imageProvider,
+          fit: BoxFit.contain,
+          mode: gesture ? ExtendedImageMode.gesture : ExtendedImageMode.none,
+          enableLoadState: true,
+          loadStateChanged: (state) {
+            if (state.extendedImageLoadState == LoadState.completed) {
+              _markPageFailure(index, failed: false);
+              return null;
+            }
+            if (state.extendedImageLoadState != LoadState.failed) return null;
+            _markPageFailure(index, failed: true);
+            return _pageRetry(
+              index,
+              beforeRetry: () => state.imageProvider.evict(),
             );
           },
         );
       },
-      itemCount: _totalPages,
-      onPageChanged: (index) {
-        _currentPage = index;
-        if (mounted) setState(() {});
-      },
     );
   }
 
-  Widget? _buildLoadState(ExtendedImageState state) {
-    if (state.extendedImageLoadState == LoadState.loading) {
-      return Container(
-        color: Colors.black,
-        height: MediaQuery.of(context).size.height * 0.8,
-        child: const Center(child: CircularProgressIndicator()),
-      );
-    }
-    if (state.extendedImageLoadState == LoadState.failed) {
-      return Container(
-        color: Colors.black,
-        height: MediaQuery.of(context).size.height * 0.8,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.broken_image, color: Colors.grey, size: 64),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: () => state.reLoadImage(),
-              child: const Icon(Icons.replay_outlined, size: 30),
-            ),
-          ],
+  Widget _pageRetry(int index, {Future<bool> Function()? beforeRetry}) {
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height,
+      child: Center(
+        child: FilledButton.icon(
+          key: Key('reader-page-retry-$index'),
+          onPressed: () async {
+            try {
+              final eviction = beforeRetry?.call();
+              if (eviction != null) {
+                unawaited(eviction.catchError((_) => false));
+              }
+            } catch (_) {
+              // Cache eviction is best-effort. A provider failure must not
+              // suppress the actual page reload.
+            }
+            try {
+              await _session.retryPage(index);
+            } catch (_) {}
+            if (mounted) setState(() {});
+          },
+          icon: const Icon(Icons.refresh),
+          label: const Text('页面加载失败，重试'),
         ),
-      );
-    }
-    return null;
-  }
-
-  Widget _buildGestureOverlay() {
-    return IgnorePointer(
-      ignoring: _isToolbarVisible,
-      child: Column(
-        children: [
-          // Top region (prev page)
-          Expanded(
-            flex: 2,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () => _goToPage(_currentPage - 1),
-            ),
-          ),
-          // Center region (toggle toolbar)
-          Expanded(
-            flex: 5,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: _toggleToolbar,
-            ),
-          ),
-          // Bottom region (next page)
-          Expanded(
-            flex: 2,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () => _goToPage(_currentPage + 1),
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildToolbar() {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+  void _markPageFailure(int index, {required bool failed}) {
+    final alreadyMarked = _failedPages.contains(index);
+    if (alreadyMarked == failed) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        if (failed) {
+          _failedPages.add(index);
+        } else {
+          _failedPages.remove(index);
+        }
+      });
+    });
+  }
+
+  Widget _gestureOverlay(ReaderReady ready) => IgnorePointer(
+    ignoring: _toolbarVisible || _failedPages.contains(ready.currentPage),
+    child: Column(
+      children: [
+        Expanded(
+          flex: 2,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => _goTo(ready.currentPage - 1, ready),
+          ),
+        ),
+        Expanded(
+          flex: 5,
+          child: GestureDetector(
+            key: const Key('reader-toolbar-toggle'),
+            behavior: HitTestBehavior.translucent,
+            onTap: () {
+              setState(() => _toolbarVisible = true);
+              _exitFullscreen();
+            },
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => _goTo(ready.currentPage + 1, ready),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  void _goTo(int page, ReaderReady ready) {
+    final target = page.clamp(0, ready.totalPages - 1).toInt();
+    if (_continuous) {
+      _itemScrollController.scrollTo(
+        index: target,
+        duration: const Duration(milliseconds: 150),
+      );
+    } else {
+      _pageController?.animateToPage(
+        target,
+        duration: const Duration(milliseconds: 150),
         curve: Curves.ease,
-        height: _isToolbarVisible ? 90 : 0,
-        color: Colors.black.withValues(alpha: 0.9),
-        child: _isToolbarVisible
-            ? AppBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                title: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.filePath.split('/').last,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      '第 ${_currentPage + 1} 页 / 共 $_totalPages 页',
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
-                      ),
-                    ),
+      );
+    }
+    _session.moveTo(target);
+  }
+
+  Widget _toolbar(ReaderReady ready) => Positioned(
+    top: 0,
+    left: 0,
+    right: 0,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      height: _toolbarVisible ? 90 : 0,
+      color: Colors.black87,
+      child: !_toolbarVisible
+          ? null
+          : AppBar(
+              backgroundColor: Colors.transparent,
+              leading: IconButton(
+                onPressed: context.pop,
+                icon: const Icon(Icons.arrow_back),
+              ),
+              title: Text(
+                '${widget.filePath.split(RegExp(r'[/\\]')).last}  '
+                '${ready.currentPage + 1}/${ready.totalPages}',
+              ),
+              actions: [
+                PopupMenuButton<ReaderMode>(
+                  key: const Key('reader-mode-menu'),
+                  initialValue: _readerMode,
+                  onSelected: (mode) {
+                    setReaderMode(mode);
+                    final currentPage =
+                        (_session.snapshot.value as ReaderReady).currentPage;
+                    final previousController = _pageController;
+                    _pageController = ExtendedPageController(
+                      initialPage: currentPage,
+                      shouldIgnorePointerWhenScrolling: false,
+                    );
+                    setState(() => _readerMode = mode);
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => previousController?.dispose(),
+                    );
+                  },
+                  itemBuilder: (_) => [
+                    for (final mode in ReaderMode.values)
+                      PopupMenuItem(value: mode, child: Text(mode.label)),
                   ],
                 ),
-                actions: [
-                  PopupMenuButton<ReaderMode>(
-                    color: Colors.black,
-                    icon: const Icon(Icons.view_carousel_outlined,
-                        color: Colors.white),
-                    onSelected: (mode) {
-                      _readerMode = mode;
-                      setReaderMode(mode);
-                      setState(() {});
-                    },
-                    itemBuilder: (_) => [
-                      for (final mode in ReaderMode.values)
-                        PopupMenuItem(
-                          value: mode,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.check,
-                                color: _readerMode == mode
-                                    ? Colors.white
-                                    : Colors.transparent,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                mode.label,
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              )
-            : null,
-      ),
-    );
-  }
-
-  Widget _buildPageNumber() {
-    if (_showPageNumbers && !_isToolbarVisible) {
-      return Positioned(
-        bottom: 24,
-        left: 0,
-        right: 0,
-        child: Text(
-          '${_currentPage + 1} / $_totalPages',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white,
-            shadows: [
-              Shadow(offset: Offset(0, 0), blurRadius: 10),
-            ],
-          ),
-        ),
-      );
-    }
-    return const SizedBox.shrink();
-  }
+                IconButton(
+                  key: const Key('reader-bookmark'),
+                  tooltip: '添加书签',
+                  onPressed: () async {
+                    await readingRecords.addBookmark(
+                      widget.filePath,
+                      ready.currentPage,
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(const SnackBar(content: Text('已添加书签')));
+                    }
+                  },
+                  icon: const Icon(Icons.bookmark_add_outlined),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() => _toolbarVisible = false);
+                    _enterFullscreen();
+                  },
+                  icon: const Icon(Icons.fullscreen),
+                ),
+              ],
+            ),
+    ),
+  );
 }

@@ -14,6 +14,7 @@ import '../reading_progress.dart';
 import '../types.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These functions are ignored because they are not marked as `pub`: `encode_page_png`, `extract_page_image_encoded`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
 
 /// 获取缓存统计信息
@@ -50,6 +51,32 @@ Future<ImageData> getPageImage({
   pageIndex: pageIndex,
   maxWidth: maxWidth,
   maxHeight: maxHeight,
+);
+
+/// Decode a page and return an explicitly PNG-encoded payload.
+Future<EncodedPage> getPageImagePng({
+  required String filePath,
+  required int pageIndex,
+  required int maxWidth,
+  required int maxHeight,
+}) => RustLib.instance.api.crateApiComicGetPageImagePng(
+  filePath: filePath,
+  pageIndex: pageIndex,
+  maxWidth: maxWidth,
+  maxHeight: maxHeight,
+);
+
+/// Extract a page in its original encoded image format.
+///
+/// Unlike [`get_page_image_png`], this path does not decode the archive entry
+/// into RGBA pixels or encode it again. The returned bytes are the original
+/// encoded image payload stored in the comic archive.
+Future<Uint8List> getPageImageEncoded({
+  required String filePath,
+  required int pageIndex,
+}) => RustLib.instance.api.crateApiComicGetPageImageEncoded(
+  filePath: filePath,
+  pageIndex: pageIndex,
 );
 
 /// 获取指定页的图片数据 (使用 ZeroCopyBuffer 优化)
@@ -265,6 +292,10 @@ ReadingProgress? getReadingProgress({required String filePath}) =>
 /// * `limit` - 返回数量限制
 List<ReadingProgress> getReadingHistory({required int limit}) =>
     RustLib.instance.api.crateApiComicGetReadingHistory(limit: limit);
+
+/// Hide one history entry without deleting its progress or bookmarks.
+void hideReadingHistory({required String filePath}) =>
+    RustLib.instance.api.crateApiComicHideReadingHistory(filePath: filePath);
 
 /// 删除阅读进度
 ///

@@ -1,4 +1,6 @@
-# 🏗️ Zephyr Comics — 架构设计文档 V2 (最终版)
+> **Historical document — superseded by [ARCHITECTURE_V3.md](./ARCHITECTURE_V3.md). “最终版” no longer describes the implemented reader path.**
+
+# 🏗️ Zephyr Comics — 架构设计文档 V2 (历史版)
 
 | 项目 | 内容 |
 | :--- | :--- |

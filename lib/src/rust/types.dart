@@ -91,6 +91,31 @@ class ComicInfo {
           totalImages == other.totalImages;
 }
 
+/// A page encoded as PNG for direct consumption by Flutter image widgets.
+class EncodedPage {
+  final int width;
+  final int height;
+  final Uint8List pngData;
+
+  const EncodedPage({
+    required this.width,
+    required this.height,
+    required this.pngData,
+  });
+
+  @override
+  int get hashCode => width.hashCode ^ height.hashCode ^ pngData.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EncodedPage &&
+          runtimeType == other.runtimeType &&
+          width == other.width &&
+          height == other.height &&
+          pngData == other.pngData;
+}
+
 /// 图像数据
 ///
 /// 解码后的图像像素数据，使用 RGBA8888 格式。

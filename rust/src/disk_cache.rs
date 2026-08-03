@@ -98,9 +98,8 @@ impl DiskCache {
         });
 
         // 创建缓存目录
-        fs::create_dir_all(&cache_dir).map_err(|e| {
-            ComicError::CacheError(format!("无法创建缓存目录：{}", e))
-        })?;
+        fs::create_dir_all(&cache_dir)
+            .map_err(|e| ComicError::CacheError(format!("无法创建缓存目录：{}", e)))?;
 
         let max_size = config.max_size_mb * 1024 * 1024;
 
@@ -280,9 +279,8 @@ impl DiskCache {
 
     /// 写入缓存文件
     fn write_cache_file(&self, path: &Path, data: &ImageData) -> Result<()> {
-        let file = File::create(path).map_err(|e| {
-            ComicError::CacheError(format!("无法创建缓存文件：{}", e))
-        })?;
+        let file = File::create(path)
+            .map_err(|e| ComicError::CacheError(format!("无法创建缓存文件：{}", e)))?;
         let mut writer = BufWriter::new(file);
 
         // 写入头部：magic + version + width + height
@@ -300,9 +298,8 @@ impl DiskCache {
 
     /// 读取缓存文件
     fn read_cache_file(&self, path: &Path) -> Result<ImageData> {
-        let file = File::open(path).map_err(|e| {
-            ComicError::CacheError(format!("无法打开缓存文件：{}", e))
-        })?;
+        let file = File::open(path)
+            .map_err(|e| ComicError::CacheError(format!("无法打开缓存文件：{}", e)))?;
         let mut reader = BufReader::new(file);
 
         // 读取头部
@@ -356,8 +353,16 @@ impl DiskCache {
                 for entry in fs::read_dir(&self.cache_dir).ok().into_iter().flatten() {
                     if let Ok(entry) = entry {
                         let path = entry.path();
-                        if path.file_name().and_then(|s| s.to_str())
-                            .map(|s| s.starts_with(&format!("v{}_{}", CACHE_VERSION, oldest_key.split('_').nth(1).unwrap_or(""))))
+                        if path
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .map(|s| {
+                                s.starts_with(&format!(
+                                    "v{}_{}",
+                                    CACHE_VERSION,
+                                    oldest_key.split('_').nth(1).unwrap_or("")
+                                ))
+                            })
                             .unwrap_or(false)
                         {
                             fs::remove_file(&path).ok();
@@ -384,9 +389,8 @@ impl DiskCache {
     /// 保存元数据
     fn save_metadata(&self) -> Result<()> {
         let path = self.get_metadata_path();
-        let file = File::create(&path).map_err(|e| {
-            ComicError::CacheError(format!("无法保存元数据：{}", e))
-        })?;
+        let file = File::create(&path)
+            .map_err(|e| ComicError::CacheError(format!("无法保存元数据：{}", e)))?;
         let mut writer = BufWriter::new(file);
 
         // 写入条目数量
@@ -416,9 +420,8 @@ impl DiskCache {
             return Ok(());
         }
 
-        let file = File::open(&path).map_err(|e| {
-            ComicError::CacheError(format!("无法加载元数据：{}", e))
-        })?;
+        let file = File::open(&path)
+            .map_err(|e| ComicError::CacheError(format!("无法加载元数据：{}", e)))?;
         let mut reader = BufReader::new(file);
 
         // 读取条目数量
@@ -444,7 +447,7 @@ impl DiskCache {
 
             let mut size = [0u8; 8];
             reader.read_exact(&mut size)?;
-            let size = usize::from_le_bytes(size);
+            let size = u64::from_le_bytes(size) as usize;
 
             let mut width = [0u8; 4];
             reader.read_exact(&mut width)?;
@@ -515,7 +518,8 @@ impl SharedDiskCache {
 
     /// 检查缓存是否存在
     pub fn contains(&self, page_key: &PageKey) -> bool {
-        self.inner.lock()
+        self.inner
+            .lock()
             .unwrap_or_else(|e| {
                 log::error!("磁盘缓存锁中毒：{}", e);
                 e.into_inner()
@@ -525,7 +529,8 @@ impl SharedDiskCache {
 
     /// 从缓存获取图像
     pub fn get(&self, page_key: &PageKey) -> Option<ImageData> {
-        self.inner.lock()
+        self.inner
+            .lock()
             .unwrap_or_else(|e| {
                 log::error!("磁盘缓存锁中毒：{}", e);
                 e.into_inner()
@@ -535,7 +540,8 @@ impl SharedDiskCache {
 
     /// 插入图像到缓存
     pub fn insert(&self, page_key: PageKey, data: &ImageData) -> Result<()> {
-        self.inner.lock()
+        self.inner
+            .lock()
             .unwrap_or_else(|e| {
                 log::error!("磁盘缓存锁中毒：{}", e);
                 e.into_inner()
@@ -545,7 +551,8 @@ impl SharedDiskCache {
 
     /// 清空缓存
     pub fn clear(&self) -> Result<()> {
-        self.inner.lock()
+        self.inner
+            .lock()
             .unwrap_or_else(|e| {
                 log::error!("磁盘缓存锁中毒：{}", e);
                 e.into_inner()
@@ -555,7 +562,8 @@ impl SharedDiskCache {
 
     /// 获取统计信息
     pub fn get_stats(&self) -> DiskCacheStats {
-        self.inner.lock()
+        self.inner
+            .lock()
             .unwrap_or_else(|e| {
                 log::error!("磁盘缓存锁中毒：{}", e);
                 e.into_inner()
@@ -586,6 +594,36 @@ fn current_timestamp() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static NEXT_TEMP_DIR: AtomicU64 = AtomicU64::new(0);
+
+    struct TestCacheDir(PathBuf);
+
+    impl TestCacheDir {
+        fn new() -> Self {
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock after epoch")
+                .as_nanos();
+            let sequence = NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed);
+            Self(std::env::temp_dir().join(format!(
+                "zephyr-disk-cache-test-{}-{nonce}-{sequence}",
+                std::process::id()
+            )))
+        }
+
+        fn config(&self, max_size_mb: usize) -> DiskCacheConfig {
+            DiskCacheConfig::new(max_size_mb).with_cache_dir(self.0.clone())
+        }
+    }
+
+    impl Drop for TestCacheDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
 
     fn create_test_image() -> ImageData {
         let data = vec![0u8; 100 * 100 * 4];
@@ -594,8 +632,8 @@ mod tests {
 
     #[test]
     fn test_disk_cache_insert_and_get() {
-        let config = DiskCacheConfig::new(10); // 10MB
-        let mut cache = DiskCache::new(config).unwrap();
+        let cache_dir = TestCacheDir::new();
+        let mut cache = DiskCache::new(cache_dir.config(10)).unwrap();
 
         let key = PageKey::new("test.cbz", 0);
         let data = create_test_image();
@@ -611,8 +649,8 @@ mod tests {
 
     #[test]
     fn test_disk_cache_contains() {
-        let config = DiskCacheConfig::new(10);
-        let mut cache = DiskCache::new(config).unwrap();
+        let cache_dir = TestCacheDir::new();
+        let mut cache = DiskCache::new(cache_dir.config(10)).unwrap();
 
         let key = PageKey::new("test.cbz", 0);
         assert!(!cache.contains(&key));
@@ -623,8 +661,8 @@ mod tests {
 
     #[test]
     fn test_disk_cache_clear() {
-        let config = DiskCacheConfig::new(10);
-        let mut cache = DiskCache::new(config).unwrap();
+        let cache_dir = TestCacheDir::new();
+        let mut cache = DiskCache::new(cache_dir.config(10)).unwrap();
 
         let key = PageKey::new("test.cbz", 0);
         cache.insert(key.clone(), &create_test_image()).unwrap();
@@ -636,11 +674,15 @@ mod tests {
 
     #[test]
     fn test_disk_cache_stats() {
-        let config = DiskCacheConfig::new(10);
-        let mut cache = DiskCache::new(config).unwrap();
+        let cache_dir = TestCacheDir::new();
+        let mut cache = DiskCache::new(cache_dir.config(10)).unwrap();
 
-        cache.insert(PageKey::new("test1.cbz", 0), &create_test_image()).unwrap();
-        cache.insert(PageKey::new("test2.cbz", 0), &create_test_image()).unwrap();
+        cache
+            .insert(PageKey::new("test1.cbz", 0), &create_test_image())
+            .unwrap();
+        cache
+            .insert(PageKey::new("test2.cbz", 0), &create_test_image())
+            .unwrap();
 
         let stats = cache.get_stats();
         assert_eq!(stats.cached_images, 2);
@@ -650,8 +692,8 @@ mod tests {
 
     #[test]
     fn test_shared_disk_cache() {
-        let config = DiskCacheConfig::new(10);
-        let cache = SharedDiskCache::new(config).unwrap();
+        let cache_dir = TestCacheDir::new();
+        let cache = SharedDiskCache::new(cache_dir.config(10)).unwrap();
 
         let key = PageKey::new("test.cbz", 0);
         cache.insert(key.clone(), &create_test_image()).unwrap();

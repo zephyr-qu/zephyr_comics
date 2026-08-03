@@ -1,13 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zephyr_comics/main.dart';
-import 'package:zephyr_comics/src/rust/frb_generated.dart';
+import 'package:zephyr_comics/app.dart';
 import 'package:integration_test/integration_test.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() async => await RustLib.init());
-  testWidgets('Can call rust function', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
-    expect(find.textContaining('Result: `Hello, Tom!`'), findsOneWidget);
+  testWidgets('launches the Zephyr Comics shell', (WidgetTester tester) async {
+    await tester.pumpWidget(const ZephyrApp());
+    await tester.pumpAndSettle();
+    expect(find.text('Zephyr'), findsOneWidget);
+    expect(find.text('书架'), findsOneWidget);
+    expect(find.text('历史'), findsOneWidget);
+    expect(find.text('设置'), findsOneWidget);
   });
 }

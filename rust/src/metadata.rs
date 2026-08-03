@@ -2,9 +2,8 @@
 //!
 //! 从漫画文件中提取元数据信息，支持 ComicInfo.xml 标准。
 
-use flutter_rust_bridge::frb;
-use std::path::Path;
 use quick_xml::{events::Event, Reader};
+use std::path::Path;
 
 use crate::error::{ComicError, Result};
 
@@ -62,7 +61,9 @@ impl ComicMetadata {
 
     /// 获取显示用的作者
     pub fn display_author(&self) -> String {
-        self.author.clone().unwrap_or_else(|| "未知作者".to_string())
+        self.author
+            .clone()
+            .unwrap_or_else(|| "未知作者".to_string())
     }
 }
 
@@ -74,10 +75,14 @@ pub fn extract_metadata(file_path: &str) -> Result<ComicMetadata> {
         return Err(ComicError::FileNotFound(file_path.to_string()));
     }
 
-    // 尝试从 ComicInfo.xml 提取
-    match extract_from_comic_info(file_path) {
-        Ok(metadata) if !metadata.is_empty() => return Ok(metadata),
-        _ => {}
+    // ComicInfo.xml may contain useful fields without a title. Preserve those
+    // fields and fill only the missing title from the original file name.
+    if let Ok(mut metadata) = extract_from_comic_info(file_path) {
+        let inferred = infer_from_filename(file_path);
+        if metadata.title.as_deref().is_none_or(str::is_empty) {
+            metadata.title = inferred.title;
+        }
+        return Ok(metadata);
     }
 
     // 从文件名推断
@@ -86,23 +91,64 @@ pub fn extract_metadata(file_path: &str) -> Result<ComicMetadata> {
 
 /// 从 ComicInfo.xml 提取元数据
 pub fn extract_from_comic_info(file_path: &str) -> Result<ComicMetadata> {
-    use zip::ZipArchive;
     use std::fs::File;
+    use zip::ZipArchive;
 
     let file = File::open(file_path)?;
     let mut archive = ZipArchive::new(file)?;
 
-    // 查找 ComicInfo.xml
-    let xml_data = match archive.by_name("ComicInfo.xml") {
-        Ok(mut entry) => {
+    // ComicInfo.xml is commonly nested beside the image folder, and its
+    // casing depends on the tool that created the archive.
+    let mut xml_data = None;
+    for index in 0..archive.len() {
+        let mut entry = archive.by_index(index)?;
+        let file_name = entry.name().rsplit('/').next().unwrap_or(entry.name());
+        if entry.is_file() && file_name.eq_ignore_ascii_case("ComicInfo.xml") {
             let mut contents = String::new();
             std::io::Read::read_to_string(&mut entry, &mut contents)?;
-            contents
+            xml_data = Some(contents);
+            break;
         }
-        Err(_) => return Err(ComicError::FileNotFound("ComicInfo.xml not found".to_string())),
-    };
+    }
+
+    let xml_data =
+        xml_data.ok_or_else(|| ComicError::FileNotFound("ComicInfo.xml not found".to_string()))?;
 
     parse_comic_info_xml(&xml_data)
+}
+
+/// Read the optional ComicInfo.xml FrontCover value without making it part of
+/// the public metadata/FRB shape. The value is an archive entry path and is
+/// resolved by the library scanner against the naturally sorted image list.
+pub fn extract_front_cover(file_path: &str) -> Result<Option<String>> {
+    use std::fs::File;
+    use zip::ZipArchive;
+
+    let file = File::open(file_path)?;
+    let mut archive = ZipArchive::new(file)?;
+    for index in 0..archive.len() {
+        let mut entry = archive.by_index(index)?;
+        let file_name = entry.name().rsplit('/').next().unwrap_or(entry.name());
+        if !entry.is_file() || !file_name.eq_ignore_ascii_case("ComicInfo.xml") {
+            continue;
+        }
+        let mut contents = String::new();
+        std::io::Read::read_to_string(&mut entry, &mut contents)?;
+        let lower = contents.to_ascii_lowercase();
+        let Some(open_start) = lower.find("<frontcover") else {
+            return Ok(None);
+        };
+        let Some(open_end_rel) = lower[open_start..].find('>') else {
+            return Ok(None);
+        };
+        let value_start = open_start + open_end_rel + 1;
+        let Some(close_rel) = lower[value_start..].find("</frontcover>") else {
+            return Ok(None);
+        };
+        let value = contents[value_start..value_start + close_rel].trim();
+        return Ok((!value.is_empty()).then(|| value.to_string()));
+    }
+    Ok(None)
 }
 
 /// 解析 ComicInfo.xml 内容
@@ -122,11 +168,14 @@ pub fn parse_comic_info_xml(xml_data: &str) -> Result<ComicMetadata> {
                 current_text.clear();
             }
             Ok(Event::Text(ref e)) => {
-                current_text = String::from_utf8_lossy(e.as_ref()).to_string();
+                current_text = e
+                    .unescape()
+                    .map_err(|error| ComicError::Internal(format!("XML 文本解析错误：{}", error)))?
+                    .into_owned();
             }
             Ok(Event::End(ref e)) => {
                 let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                
+
                 if tag_name == current_tag && !current_text.is_empty() {
                     match tag_name.as_str() {
                         "Title" => metadata.title = Some(current_text.clone()),
@@ -140,7 +189,9 @@ pub fn parse_comic_info_xml(xml_data: &str) -> Result<ComicMetadata> {
                             }
                         }
                         "Publisher" => metadata.publisher = Some(current_text.clone()),
-                        "Summary" | "Description" => metadata.description = Some(current_text.clone()),
+                        "Summary" | "Description" => {
+                            metadata.description = Some(current_text.clone())
+                        }
                         "Genre" => {
                             for genre in current_text.split(',').map(|s| s.trim()) {
                                 if !genre.is_empty() {
@@ -208,7 +259,9 @@ pub fn generate_cover_thumbnail(image_data: &[u8], size: u32) -> Result<Vec<u8>>
 
     let img = load_from_memory(image_data)?;
 
-    let thumb = img.resize_exact(size, size, image::imageops::FilterType::Lanczos3);
+    let longest_edge = img.width().max(img.height());
+    let target = size.min(longest_edge);
+    let thumb = img.resize(target, target, image::imageops::FilterType::Lanczos3);
 
     let mut png_data = Vec::new();
     thumb.write_to(&mut Cursor::new(&mut png_data), image::ImageFormat::Png)?;
@@ -219,6 +272,29 @@ pub fn generate_cover_thumbnail(image_data: &[u8], size: u32) -> Result<Vec<u8>>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use zip::write::FileOptions;
+
+    fn temp_cbz(name: &str, entries: &[(&str, &[u8])]) -> std::path::PathBuf {
+        let mut path = std::env::temp_dir();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        path.push(format!("zephyr_metadata_{nonce}_{name}.cbz"));
+        let file = File::create(&path).unwrap();
+        let mut archive = zip::ZipWriter::new(file);
+        for (entry_name, bytes) in entries {
+            archive
+                .start_file(*entry_name, FileOptions::default())
+                .unwrap();
+            archive.write_all(bytes).unwrap();
+        }
+        archive.finish().unwrap();
+        path
+    }
 
     #[test]
     fn test_metadata_creation() {
@@ -272,5 +348,46 @@ mod tests {
         let metadata = infer_from_filename("/comics/batman/batman_01.cbz");
         assert_eq!(metadata.title, Some("batman_01".to_string()));
         assert_eq!(metadata.author, Some("batman".to_string()));
+    }
+
+    #[test]
+    fn finds_nested_comic_info_case_insensitively() {
+        let xml = br#"<ComicInfo><Title>Nested Title</Title></ComicInfo>"#;
+        let path = temp_cbz("nested", &[("metadata/COMICINFO.XML", xml)]);
+
+        let metadata = extract_metadata(path.to_str().unwrap()).unwrap();
+
+        assert_eq!(metadata.title.as_deref(), Some("Nested Title"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn preserves_partial_comic_info_and_fills_missing_title() {
+        let xml = br#"<ComicInfo><Summary>Tom &amp; Jerry</Summary></ComicInfo>"#;
+        let path = temp_cbz("Fallback Title", &[("ComicInfo.xml", xml)]);
+        let expected_title = path.file_stem().unwrap().to_string_lossy().to_string();
+
+        let metadata = extract_metadata(path.to_str().unwrap()).unwrap();
+
+        assert_eq!(metadata.title.as_deref(), Some(expected_title.as_str()));
+        assert_eq!(metadata.description.as_deref(), Some("Tom & Jerry"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn cover_thumbnail_preserves_aspect_ratio() {
+        let image = image::DynamicImage::new_rgb8(400, 200);
+        let mut source = Vec::new();
+        image
+            .write_to(
+                &mut std::io::Cursor::new(&mut source),
+                image::ImageFormat::Png,
+            )
+            .unwrap();
+
+        let thumbnail = generate_cover_thumbnail(&source, 100).unwrap();
+        let decoded = image::load_from_memory(&thumbnail).unwrap();
+
+        assert_eq!((decoded.width(), decoded.height()), (100, 50));
     }
 }

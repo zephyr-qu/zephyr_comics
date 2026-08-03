@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -190831987;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -884794963;
 
 // Section: executor
 
@@ -668,6 +668,92 @@ fn wire__crate__api__comic__get_page_image_impl(
         },
     )
 }
+fn wire__crate__api__comic__get_page_image_encoded_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "get_page_image_encoded",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_file_path = <String>::sse_decode(&mut deserializer);
+            let api_page_index = <i32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let output_ok = crate::api::comic::get_page_image_encoded(
+                            api_file_path,
+                            api_page_index,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__comic__get_page_image_png_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "get_page_image_png",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_file_path = <String>::sse_decode(&mut deserializer);
+            let api_page_index = <i32>::sse_decode(&mut deserializer);
+            let api_max_width = <i32>::sse_decode(&mut deserializer);
+            let api_max_height = <i32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let output_ok = crate::api::comic::get_page_image_png(
+                            api_file_path,
+                            api_page_index,
+                            api_max_width,
+                            api_max_height,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__comic__get_page_image_zero_copy_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -984,6 +1070,38 @@ fn wire__crate__api__simple__greet_impl(
                 let output_ok = Result::<_, ()>::Ok(crate::api::simple::greet(api_name))?;
                 Ok(output_ok)
             })())
+        },
+    )
+}
+fn wire__crate__api__comic__hide_reading_history_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "hide_reading_history",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_file_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                (move || {
+                    let output_ok = crate::api::comic::hide_reading_history(api_file_path)?;
+                    Ok(output_ok)
+                })(),
+            )
         },
     )
 }
@@ -1677,6 +1795,20 @@ impl SseDecode for crate::disk_cache::DiskCacheStats {
     }
 }
 
+impl SseDecode for crate::types::EncodedPage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_width = <i32>::sse_decode(deserializer);
+        let mut var_height = <i32>::sse_decode(deserializer);
+        let mut var_pngData = <Vec<u8>>::sse_decode(deserializer);
+        return crate::types::EncodedPage {
+            width: var_width,
+            height: var_height,
+            png_data: var_pngData,
+        };
+    }
+}
+
 impl SseDecode for f32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2064,15 +2196,19 @@ fn pde_ffi_dispatcher_primary_impl(
     match func_id {
         10 => wire__crate__api__comic__generate_thumbnail_impl(port, ptr, rust_vec_len, data_len),
         19 => wire__crate__api__comic__get_page_image_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__comic__get_page_image_zero_copy_impl(
+        20 => {
+            wire__crate__api__comic__get_page_image_encoded_impl(port, ptr, rust_vec_len, data_len)
+        }
+        21 => wire__crate__api__comic__get_page_image_png_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__comic__get_page_image_zero_copy_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        30 => wire__crate__api__comic__init_app_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__comic__preload_pages_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__comic__init_app_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__comic__preload_pages_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2106,28 +2242,29 @@ fn pde_ffi_dispatcher_sync_impl(
         16 => wire__crate__api__comic__get_disk_cache_stats_impl(ptr, rust_vec_len, data_len),
         17 => wire__crate__api__comic__get_library_entries_impl(ptr, rust_vec_len, data_len),
         18 => wire__crate__api__comic__get_next_page_impl(ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__comic__get_pending_preload_tasks_impl(ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__comic__get_prev_page_impl(ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__comic__get_reading_direction_impl(ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__comic__get_reading_history_impl(ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__comic__get_reading_progress_impl(ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__comic__get_reading_stats_impl(ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__comic__get_recently_added_impl(ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__comic__get_supported_formats_impl(ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__comic__is_valid_comic_impl(ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__comic__remove_bookmark_impl(ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__comic__remove_from_library_impl(ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__comic__remove_reading_progress_impl(ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__comic__save_reading_progress_impl(ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__comic__scan_directory_to_library_impl(ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__comic__search_library_impl(ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__comic__set_archive_cache_size_impl(ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__comic__set_cache_limit_impl(ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__comic__set_disk_cache_limit_impl(ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__comic__set_preload_strategy_impl(ptr, rust_vec_len, data_len),
-        44 => wire__crate__api__comic__set_reading_direction_impl(ptr, rust_vec_len, data_len),
-        45 => wire__crate__api__comic__update_last_opened_impl(ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__comic__get_pending_preload_tasks_impl(ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__comic__get_prev_page_impl(ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__comic__get_reading_direction_impl(ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__comic__get_reading_history_impl(ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__comic__get_reading_progress_impl(ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__comic__get_reading_stats_impl(ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__comic__get_recently_added_impl(ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__comic__get_supported_formats_impl(ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__comic__hide_reading_history_impl(ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__comic__is_valid_comic_impl(ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__comic__remove_bookmark_impl(ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__comic__remove_from_library_impl(ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__comic__remove_reading_progress_impl(ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__comic__save_reading_progress_impl(ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__comic__scan_directory_to_library_impl(ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__comic__search_library_impl(ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__comic__set_archive_cache_size_impl(ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__comic__set_cache_limit_impl(ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__comic__set_disk_cache_limit_impl(ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__comic__set_preload_strategy_impl(ptr, rust_vec_len, data_len),
+        47 => wire__crate__api__comic__set_reading_direction_impl(ptr, rust_vec_len, data_len),
+        48 => wire__crate__api__comic__update_last_opened_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2285,6 +2422,23 @@ impl flutter_rust_bridge::IntoIntoDart<crate::disk_cache::DiskCacheStats>
     for crate::disk_cache::DiskCacheStats
 {
     fn into_into_dart(self) -> crate::disk_cache::DiskCacheStats {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::types::EncodedPage {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.width.into_into_dart().into_dart(),
+            self.height.into_into_dart().into_dart(),
+            self.png_data.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::types::EncodedPage {}
+impl flutter_rust_bridge::IntoIntoDart<crate::types::EncodedPage> for crate::types::EncodedPage {
+    fn into_into_dart(self) -> crate::types::EncodedPage {
         self
     }
 }
@@ -2546,6 +2700,15 @@ impl SseEncode for crate::disk_cache::DiskCacheStats {
         <usize>::sse_encode(self.current_size, serializer);
         <usize>::sse_encode(self.max_size, serializer);
         <String>::sse_encode(self.cache_dir, serializer);
+    }
+}
+
+impl SseEncode for crate::types::EncodedPage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.width, serializer);
+        <i32>::sse_encode(self.height, serializer);
+        <Vec<u8>>::sse_encode(self.png_data, serializer);
     }
 }
 

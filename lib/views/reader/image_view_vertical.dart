@@ -58,11 +58,13 @@ class _ImageViewVerticalState extends State<ImageViewVertical>
               File(widget.cachePath),
               fit: BoxFit.contain,
               clearMemoryCacheWhenDispose: true,
-)
+            )
           else
             const SizedBox(
               height: 200,
-              child: Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+              child: Center(
+                child: Icon(Icons.broken_image, color: Colors.grey),
+              ),
             ),
           if (widget.index + 1 == widget.length)
             Padding(

@@ -1,15 +1,13 @@
 //! 数据类型模块
-//! 
+//!
 //! 定义漫画引擎的核心数据结构，包括：
 //! - 漫画文件信息 (ComicInfo)
 //! - 章节信息 (ChapterInfo)
 //! - 图像数据 (ImageData)
 //! - 缓存键 (PageKey)
 
-use flutter_rust_bridge::frb;
-
 /// 漫画文件信息
-/// 
+///
 /// 描述一个漫画文件 (CBZ) 的基本信息和章节列表。
 #[derive(Debug, Clone)]
 pub struct ComicInfo {
@@ -28,7 +26,7 @@ pub struct ComicInfo {
 }
 
 /// 章节信息
-/// 
+///
 /// 描述漫画中的一个章节 (或单文件漫画的页面列表)。
 #[derive(Debug, Clone)]
 pub struct ChapterInfo {
@@ -41,7 +39,7 @@ pub struct ChapterInfo {
 }
 
 /// 图像数据
-/// 
+///
 /// 解码后的图像像素数据，使用 RGBA8888 格式。
 /// Flutter 侧可直接使用 `Image.memory()` 显示。
 #[derive(Debug, Clone)]
@@ -56,6 +54,14 @@ pub struct ImageData {
     pub format: String,
 }
 
+/// A page encoded as PNG for direct consumption by Flutter image widgets.
+#[derive(Debug, Clone)]
+pub struct EncodedPage {
+    pub width: i32,
+    pub height: i32,
+    pub png_data: Vec<u8>,
+}
+
 impl ImageData {
     /// 创建新的 ImageData
     pub fn new(width: i32, height: i32, data: Vec<u8>) -> Self {
@@ -66,12 +72,12 @@ impl ImageData {
             format: "RGBA8888".to_string(),
         }
     }
-    
+
     /// 计算内存占用 (字节)
     pub fn memory_size(&self) -> usize {
         self.data.len()
     }
-    
+
     /// 创建占位图 (用于错误情况)
     pub fn placeholder() -> Self {
         // 创建一个 64x64 的灰色占位图
@@ -85,7 +91,7 @@ impl ImageData {
 }
 
 /// 页面缓存键
-/// 
+///
 /// 用于 LRU 缓存的唯一标识符。
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PageKey {
@@ -105,7 +111,7 @@ impl PageKey {
 }
 
 /// 缩略图数据
-/// 
+///
 /// 用于书架展示的缩略图。
 #[derive(Debug, Clone)]
 pub struct ThumbnailData {
@@ -118,7 +124,7 @@ pub struct ThumbnailData {
 }
 
 /// 阅读进度
-/// 
+///
 /// 记录用户的阅读位置。
 #[derive(Debug, Clone)]
 pub struct ReadProgress {
@@ -145,7 +151,7 @@ impl ComicFormat {
             _ => ComicFormat::Unknown,
         }
     }
-    
+
     /// 获取格式字符串
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -187,7 +193,7 @@ mod tests {
         let key1 = PageKey::new("/path/to/file.cbz", 5);
         let key2 = PageKey::new("/path/to/file.cbz", 5);
         let key3 = PageKey::new("/path/to/file.cbz", 6);
-        
+
         assert_eq!(key1, key2);
         assert_ne!(key1, key3);
     }

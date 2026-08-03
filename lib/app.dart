@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 import 'router/router.dart';
 import 'signals/app_signals.dart';
+import 'models/settings_options.dart';
 
 class ZephyrApp extends StatelessWidget {
   const ZephyrApp({super.key});
@@ -10,7 +11,7 @@ class ZephyrApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return SignalBuilder(
       builder: (context) {
-        final dark = isDarkMode.value;
+        final preference = themePreference.value;
         return MaterialApp.router(
           title: 'Zephyr Comics',
           debugShowCheckedModeBanner: false,
@@ -24,7 +25,11 @@ class ZephyrApp extends StatelessWidget {
             brightness: Brightness.dark,
             useMaterial3: true,
           ),
-          themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+          themeMode: switch (preference) {
+            ThemePreference.system => ThemeMode.system,
+            ThemePreference.light => ThemeMode.light,
+            ThemePreference.dark => ThemeMode.dark,
+          },
           routerConfig: router,
         );
       },
