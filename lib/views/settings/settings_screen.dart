@@ -29,22 +29,6 @@ class SettingsScreen extends StatelessWidget {
           const _ReaderModeTile(),
           SignalBuilder(
             builder: (context) => SwitchListTile(
-              secondary: const Icon(Icons.battery_saver_outlined),
-              title: const Text('保持屏幕常亮'),
-              value: keepScreenAwake.value,
-              onChanged: setKeepScreenAwake,
-            ),
-          ),
-          SignalBuilder(
-            builder: (context) => SwitchListTile(
-              secondary: const Icon(Icons.volume_up_outlined),
-              title: const Text('音量键翻页'),
-              value: volumeKeyPaging.value,
-              onChanged: setVolumeKeyPaging,
-            ),
-          ),
-          SignalBuilder(
-            builder: (context) => SwitchListTile(
               secondary: const Icon(Icons.numbers_outlined),
               title: const Text('显示页码'),
               value: showPageNumber.value,

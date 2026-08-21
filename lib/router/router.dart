@@ -1,9 +1,12 @@
 import 'package:go_router/go_router.dart';
+import '../library/comic_library.dart';
 import '../views/app_shell.dart';
 import '../views/library/library_screen.dart';
 import '../views/history/history_screen.dart';
 import '../views/settings/settings_screen.dart';
+import '../views/library/comic_detail_screen.dart';
 import '../views/reader/comic_reader_screen.dart';
+import '../reader/reader_launch.dart';
 
 final GoRouter router = GoRouter(
   initialLocation: '/library',
@@ -16,6 +19,13 @@ final GoRouter router = GoRouter(
           pageBuilder: (context, state) => NoTransitionPage(
             key: state.pageKey,
             child: const LibraryScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/comic-detail',
+          pageBuilder: (context, state) => NoTransitionPage(
+            key: state.pageKey,
+            child: ComicDetailScreen(entry: state.extra as ComicLibraryEntry),
           ),
         ),
         GoRoute(
@@ -36,8 +46,16 @@ final GoRouter router = GoRouter(
     ),
     GoRoute(
       path: '/reader',
-      builder: (context, state) =>
-          ComicReaderScreen(filePath: state.extra as String),
+      builder: (context, state) {
+        final launch = state.extra is ReaderLaunch
+            ? state.extra as ReaderLaunch
+            : ReaderLaunch(filePath: state.extra as String);
+        return ComicReaderScreen(
+          filePath: launch.filePath,
+          initialPage: launch.initialPage,
+          preserveProgressOnStart: launch.preserveProgressOnStart,
+        );
+      },
     ),
   ],
 );

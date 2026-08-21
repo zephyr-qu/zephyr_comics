@@ -1,5 +1,6 @@
 import 'package:signals_flutter/signals_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 import '../models/reader_mode.dart';
 import '../models/settings_options.dart';
 import '../src/rust/library_db.dart' show LibraryEntry;
@@ -81,6 +82,7 @@ Future<void> loadPreferences() async {
     (value) => value.name == (prefs.getString('readerBackground') ?? 'black'),
     orElse: () => ReaderBackground.black,
   );
+  await _applyOrientationPreference(orientationPreference.value);
   if (scanDirectoryPath.value.isNotEmpty) {
     await refreshLibrary();
   }
@@ -218,8 +220,18 @@ Future<void> setShowPageNumber(bool value) async {
 
 Future<void> setOrientationPreference(OrientationPreference value) async {
   orientationPreference.value = value;
+  await _applyOrientationPreference(value);
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString('orientationPreference', value.name);
+}
+
+Future<void> _applyOrientationPreference(OrientationPreference value) {
+  final orientations = switch (value) {
+    OrientationPreference.auto => <DeviceOrientation>[],
+    OrientationPreference.portrait => [DeviceOrientation.portraitUp],
+    OrientationPreference.landscape => [DeviceOrientation.landscapeLeft],
+  };
+  return SystemChrome.setPreferredOrientations(orientations);
 }
 
 Future<void> setReaderBackground(ReaderBackground value) async {

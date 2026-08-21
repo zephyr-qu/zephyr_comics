@@ -30,11 +30,15 @@ final class ReaderSession {
   ReaderSession({
     required this.filePath,
     required this.engine,
+    this.initialPage,
+    this.preserveProgressOnStart = false,
     this.saveDelay = const Duration(milliseconds: 400),
   });
 
   final String filePath;
   final ReaderEngine engine;
+  final int? initialPage;
+  final bool preserveProgressOnStart;
   final Duration saveDelay;
   final snapshot = ValueNotifier<ReaderSnapshot>(const ReaderOpening());
   static const int _prefetchAhead = 4;
@@ -66,7 +70,7 @@ final class ReaderSession {
       if (book.totalPages <= 0) {
         throw StateError('漫画文件中没有页面');
       }
-      final page = (progress?.pageIndex ?? 0)
+      final page = (initialPage ?? progress?.pageIndex ?? 0)
           .clamp(0, book.totalPages - 1)
           .toInt();
       snapshot.value = ReaderReady(
@@ -112,6 +116,7 @@ final class ReaderSession {
     if (ready is! ReaderReady || _closed) return;
     final index = pageIndex.clamp(0, ready.totalPages - 1).toInt();
     final delta = index - ready.currentPage;
+    final moved = delta != 0;
     if (delta != 0) _readingDirection = delta.sign;
     snapshot.value = ReaderReady(
       currentPage: index,
@@ -119,8 +124,10 @@ final class ReaderSession {
       warning: ready.warning,
     );
     _schedulePageWindow(index, ready.totalPages);
-    _saveTimer?.cancel();
-    _saveTimer = Timer(saveDelay, () => _enqueuePersist(index));
+    if (moved || !preserveProgressOnStart) {
+      _saveTimer?.cancel();
+      _saveTimer = Timer(saveDelay, () => _enqueuePersist(index));
+    }
   }
 
   Future<void> close() async {

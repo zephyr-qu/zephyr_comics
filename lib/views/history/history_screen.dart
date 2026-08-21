@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../library/comic_library.dart';
 import '../../reading/reading_records.dart';
 import '../../signals/app_signals.dart';
 
@@ -87,13 +88,29 @@ class _HistoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = entry.filePath.split(RegExp(r'[/\\]')).last;
-    final progress =
-        '${entry.pageIndex + 1} · ${entry.completionPercent.toStringAsFixed(0)}%';
+    final libraryEntry = _libraryEntryFor(entry.filePath);
+    final title =
+        libraryEntry?.title ?? entry.filePath.split(RegExp(r'[/\\]')).last;
+    final totalPages = libraryEntry?.totalPages;
+    final progress = totalPages == null
+        ? '第 ${entry.pageIndex + 1} 页 · ${entry.completionPercent.toStringAsFixed(0)}%'
+        : '第 ${entry.pageIndex + 1} / $totalPages 页';
     return ListTile(
-      leading: const CircleAvatar(child: Icon(Icons.menu_book_outlined)),
+      leading: SizedBox(
+        width: 48,
+        height: 64,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: libraryEntry?.coverData == null
+              ? const ColoredBox(
+                  color: Colors.black12,
+                  child: Icon(Icons.menu_book_outlined),
+                )
+              : Image.memory(libraryEntry!.coverData!, fit: BoxFit.cover),
+        ),
+      ),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text('第 $progress · ${_date(entry.lastReadAt)}'),
+      subtitle: Text('$progress · ${_date(entry.lastReadAt)}'),
       onTap: () => context.push('/reader', extra: entry.filePath),
       trailing: PopupMenuButton<String>(
         onSelected: (value) async {
@@ -110,4 +127,11 @@ class _HistoryTile extends StatelessWidget {
   }
 
   String _date(DateTime value) => '${value.month}/${value.day}';
+
+  ComicLibraryEntry? _libraryEntryFor(String path) {
+    for (final item in librarySnapshot.value.entries) {
+      if (item.path == path) return item;
+    }
+    return null;
+  }
 }

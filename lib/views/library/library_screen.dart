@@ -177,16 +177,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
       onRefresh: refreshLibrary,
       child: GridView.builder(
         padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          childAspectRatio: 0.7,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _columnCount(context),
+          childAspectRatio: 0.62,
           crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          mainAxisSpacing: 16,
         ),
         itemCount: entries.length,
         itemBuilder: (context, index) => _ComicCard(entry: entries[index]),
       ),
     );
+  }
+
+  int _columnCount(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    return (width / 150).floor().clamp(2, 6);
   }
 
   Widget _centerMessage(
@@ -256,7 +261,7 @@ class _ComicCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme;
     return GestureDetector(
-      onTap: () => context.push('/reader', extra: entry.path),
+      onTap: () => context.push('/comic-detail', extra: entry),
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -281,11 +286,56 @@ class _ComicCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                entry.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.auto_stories_outlined,
+                        size: 14,
+                        color: color.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          '${entry.totalPages} 页 · ${entry.format.toUpperCase()}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (entry.lastReadAt != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.play_circle_outline,
+                          size: 14,
+                          color: color.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '最近阅读',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: color.primary),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
           ],

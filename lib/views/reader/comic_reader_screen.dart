@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../models/reader_mode.dart';
+import '../../models/settings_options.dart';
 import '../../reader/frb_reader_engine.dart';
 import '../../reader/reader_engine.dart';
 import '../../reader/reader_session.dart';
@@ -16,9 +17,13 @@ class ComicReaderScreen extends StatefulWidget {
   const ComicReaderScreen({
     super.key,
     required this.filePath,
+    this.initialPage,
+    this.preserveProgressOnStart = false,
     this.readerEngine,
   });
   final String filePath;
+  final int? initialPage;
+  final bool preserveProgressOnStart;
   final ReaderEngine? readerEngine;
 
   @override
@@ -33,6 +38,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
   ReaderMode _readerMode = ReaderMode.vertical;
   bool _toolbarVisible = false;
   final Set<int> _failedPages = <int>{};
+  final Set<int> _bookmarkedPages = <int>{};
 
   @override
   void initState() {
@@ -40,6 +46,8 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
     _session = ReaderSession(
       filePath: widget.filePath,
       engine: widget.readerEngine ?? FrbReaderEngine(),
+      initialPage: widget.initialPage,
+      preserveProgressOnStart: widget.preserveProgressOnStart,
     );
     _itemScrollController = ItemScrollController();
     _positionsListener = ItemPositionsListener.create()
@@ -47,6 +55,22 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
     _readerMode = readerMode.value;
     _enterFullscreen();
     _session.open();
+    _loadBookmarks();
+  }
+
+  Future<void> _loadBookmarks() async {
+    try {
+      final bookmarks = await readingRecords.bookmarksFor(widget.filePath);
+      if (!mounted) return;
+      setState(() {
+        _bookmarkedPages
+          ..clear()
+          ..addAll(bookmarks.map((bookmark) => bookmark.pageIndex));
+      });
+    } catch (_) {
+      // Bookmark state is an enhancement; reading remains available if it
+      // cannot be loaded.
+    }
   }
 
   @override
@@ -87,7 +111,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
       valueListenable: _session.snapshot,
       builder: (context, snapshot, _) {
         return Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: _backgroundColor(context),
           body: switch (snapshot) {
             ReaderOpening() => const Center(child: CircularProgressIndicator()),
             ReaderFailed(:final failure) => _fatal(failure),
@@ -161,7 +185,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
               ),
             ),
           ),
-        if (!_toolbarVisible)
+        if (!_toolbarVisible && showPageNumber.value)
           Positioned(
             bottom: 24,
             left: 0,
@@ -325,70 +349,137 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
     top: 0,
     left: 0,
     right: 0,
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      height: _toolbarVisible ? 90 : 0,
-      color: Colors.black87,
-      child: !_toolbarVisible
-          ? null
-          : AppBar(
-              backgroundColor: Colors.transparent,
-              leading: IconButton(
-                onPressed: context.pop,
-                icon: const Icon(Icons.arrow_back),
+    child: SafeArea(
+      bottom: false,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: _toolbarVisible ? 132 : 0,
+        color: Colors.black87,
+        child: !_toolbarVisible
+            ? null
+            : Column(
+                children: [
+                  SizedBox(
+                    height: 64,
+                    child: Row(
+                      children: [
+                        IconButton(
+                          tooltip: '返回',
+                          onPressed: context.pop,
+                          icon: const Icon(Icons.arrow_back),
+                        ),
+                        Expanded(
+                          child: Text(
+                            '${widget.filePath.split(RegExp(r'[/\\]')).last}  '
+                            '${ready.currentPage + 1}/${ready.totalPages}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        PopupMenuButton<ReaderMode>(
+                          key: const Key('reader-mode-menu'),
+                          tooltip: '阅读模式',
+                          initialValue: _readerMode,
+                          onSelected: (mode) {
+                            setReaderMode(mode);
+                            final currentPage =
+                                (_session.snapshot.value as ReaderReady)
+                                    .currentPage;
+                            final previousController = _pageController;
+                            _pageController = ExtendedPageController(
+                              initialPage: currentPage,
+                              shouldIgnorePointerWhenScrolling: false,
+                            );
+                            setState(() => _readerMode = mode);
+                            WidgetsBinding.instance.addPostFrameCallback(
+                              (_) => previousController?.dispose(),
+                            );
+                          },
+                          itemBuilder: (_) => [
+                            for (final mode in ReaderMode.values)
+                              PopupMenuItem(
+                                value: mode,
+                                child: Text(mode.label),
+                              ),
+                          ],
+                        ),
+                        IconButton(
+                          key: const Key('reader-bookmark'),
+                          tooltip: _bookmarkedPages.contains(ready.currentPage)
+                              ? '取消书签'
+                              : '添加书签',
+                          onPressed: () => _toggleBookmark(ready.currentPage),
+                          icon: Icon(
+                            _bookmarkedPages.contains(ready.currentPage)
+                                ? Icons.bookmark
+                                : Icons.bookmark_add_outlined,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: '退出全屏',
+                          onPressed: () {
+                            setState(() => _toolbarVisible = false);
+                            _enterFullscreen();
+                          },
+                          icon: const Icon(Icons.fullscreen),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Slider(
+                      value: ready.currentPage.toDouble(),
+                      min: 0,
+                      max: (ready.totalPages - 1).toDouble(),
+                      divisions: ready.totalPages > 1
+                          ? ready.totalPages - 1
+                          : null,
+                      label: '第 ${ready.currentPage + 1} 页',
+                      onChanged: (value) => _goTo(value.round(), ready),
+                    ),
+                  ),
+                ],
               ),
-              title: Text(
-                '${widget.filePath.split(RegExp(r'[/\\]')).last}  '
-                '${ready.currentPage + 1}/${ready.totalPages}',
-              ),
-              actions: [
-                PopupMenuButton<ReaderMode>(
-                  key: const Key('reader-mode-menu'),
-                  initialValue: _readerMode,
-                  onSelected: (mode) {
-                    setReaderMode(mode);
-                    final currentPage =
-                        (_session.snapshot.value as ReaderReady).currentPage;
-                    final previousController = _pageController;
-                    _pageController = ExtendedPageController(
-                      initialPage: currentPage,
-                      shouldIgnorePointerWhenScrolling: false,
-                    );
-                    setState(() => _readerMode = mode);
-                    WidgetsBinding.instance.addPostFrameCallback(
-                      (_) => previousController?.dispose(),
-                    );
-                  },
-                  itemBuilder: (_) => [
-                    for (final mode in ReaderMode.values)
-                      PopupMenuItem(value: mode, child: Text(mode.label)),
-                  ],
-                ),
-                IconButton(
-                  key: const Key('reader-bookmark'),
-                  tooltip: '添加书签',
-                  onPressed: () async {
-                    await readingRecords.addBookmark(
-                      widget.filePath,
-                      ready.currentPage,
-                    );
-                    if (mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(const SnackBar(content: Text('已添加书签')));
-                    }
-                  },
-                  icon: const Icon(Icons.bookmark_add_outlined),
-                ),
-                IconButton(
-                  onPressed: () {
-                    setState(() => _toolbarVisible = false);
-                    _enterFullscreen();
-                  },
-                  icon: const Icon(Icons.fullscreen),
-                ),
-              ],
-            ),
+      ),
     ),
   );
+
+  Future<void> _toggleBookmark(int page) async {
+    try {
+      if (_bookmarkedPages.contains(page)) {
+        await readingRecords.removeBookmark(widget.filePath, page);
+        if (mounted) {
+          setState(() => _bookmarkedPages.remove(page));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('已取消书签')));
+        }
+      } else {
+        await readingRecords.addBookmark(widget.filePath, page);
+        if (mounted) {
+          setState(() => _bookmarkedPages.add(page));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('已添加书签')));
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('书签操作失败，请重试')));
+      }
+    }
+  }
+
+  Color _backgroundColor(BuildContext context) =>
+      switch (readerBackground.value) {
+        ReaderBackground.black => Colors.black,
+        ReaderBackground.dark => const Color(0xff151515),
+        ReaderBackground.paper => const Color(0xfff2ecdf),
+        ReaderBackground.system =>
+          Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xff151515)
+              : const Color(0xfff2ecdf),
+      };
 }
