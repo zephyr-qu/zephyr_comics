@@ -278,12 +278,6 @@ fn hash_file_name(name: &str) -> usize {
     hasher.finish() as usize
 }
 
-/// 便捷函数：解码单张图片
-pub fn decode_image(data: &[u8], max_width: u32, max_height: u32) -> Result<ImageData> {
-    let decoder = ImageDecoder::new(DecoderConfig::default());
-    decoder.decode_image(data, max_width, max_height)
-}
-
 /// 便捷函数：从压缩包解码图片
 pub fn decode_page(
     archive_path: &str,
@@ -293,17 +287,6 @@ pub fn decode_page(
 ) -> Result<ImageData> {
     let decoder = ImageDecoder::new(DecoderConfig::default());
     decoder.decode_from_archive(archive_path, file_name, max_width, max_height)
-}
-
-/// 便捷函数：并行解码多页
-pub fn decode_pages_parallel(
-    archive_path: &str,
-    file_names: &[String],
-    max_width: u32,
-    max_height: u32,
-) -> Vec<Result<ImageData>> {
-    let decoder = ImageDecoder::new(DecoderConfig::default());
-    decoder.decode_multiple_from_archive(archive_path, file_names, max_width, max_height)
 }
 
 /// 便捷函数：生成缩略图
@@ -327,27 +310,7 @@ mod tests {
         data
     }
 
-    #[test]
-    fn test_decode_image_basic() {
-        let data = create_test_png();
-        let result = decode_image(&data, 200, 200);
-        assert!(result.is_ok());
-        let img = result.unwrap();
-        assert_eq!(img.width, 100);
-        assert_eq!(img.height, 100);
-        assert_eq!(img.format, "RGBA8888");
-    }
 
-    #[test]
-    fn test_decode_image_downscale() {
-        let data = create_test_png();
-        // 要求缩小到 50x50
-        let result = decode_image(&data, 50, 50);
-        assert!(result.is_ok());
-        let img = result.unwrap();
-        assert_eq!(img.width, 50);
-        assert_eq!(img.height, 50);
-    }
 
     #[test]
     fn test_calculate_target_dimensions() {
@@ -392,3 +355,5 @@ mod tests {
         assert!(!thumb.unwrap().is_empty());
     }
 }
+
+

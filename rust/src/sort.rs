@@ -24,11 +24,6 @@ pub fn natural_sort(files: &[String]) -> Vec<String> {
     sorted
 }
 
-/// 对文件名进行智能排序 (原地排序)
-pub fn natural_sort_in_place(files: &mut [String]) {
-    files.sort_by(|a, b| natural_cmp(a, b));
-}
-
 /// 自然排序比较函数
 ///
 /// 比较两个字符串，将连续数字作为数值比较。
@@ -92,103 +87,6 @@ fn natural_cmp(a: &str, b: &str) -> Ordering {
     }
 }
 
-/// 特殊文件名权重
-///
-/// 给特殊文件 (如封面) 更高的优先级，使其排在前面。
-fn special_file_priority(filename: &str) -> u8 {
-    let lower = filename.to_lowercase();
-
-    // 封面类文件优先级最高
-    if lower.contains("cover") || lower.contains("封面") {
-        return 100;
-    }
-
-    // 目录/介绍类文件
-    if lower.contains("index") || lower.contains("目录") || lower.contains("intro") {
-        return 90;
-    }
-
-    // 彩页/插页
-    if lower.contains("color") || lower.contains("彩页") {
-        return 80;
-    }
-
-    // 默认优先级
-    50
-}
-
-/// 带特殊文件处理的智能排序
-///
-/// 将特殊文件 (封面、目录等) 排在前面，其余文件按自然排序。
-pub fn smart_sort(files: &[String]) -> Vec<String> {
-    let mut special_files: Vec<(u8, String)> = Vec::new();
-    let mut normal_files: Vec<String> = Vec::new();
-
-    for file in files {
-        let priority = special_file_priority(file);
-        if priority >= 80 {
-            special_files.push((priority, file.clone()));
-        } else {
-            normal_files.push(file.clone());
-        }
-    }
-
-    // 特殊文件按优先级降序排序
-    special_files.sort_by(|a, b| b.0.cmp(&a.0));
-    let special_sorted: Vec<String> = special_files.into_iter().map(|(_, f)| f).collect();
-
-    // 普通文件自然排序
-    let mut normal_sorted = natural_sort(&normal_files);
-
-    // 合并结果
-    let mut result = special_sorted;
-    result.append(&mut normal_sorted);
-    result
-}
-
-/// 从文件路径中提取章节信息
-///
-/// 支持格式：
-/// - `chapter_01/001.png` -> ("chapter_01", "001.png")
-/// - `01 - Title/002.jpg` -> ("01 - Title", "002.jpg")
-/// - `single.cbz` -> ("", "single.cbz")
-pub fn extract_chapter_and_file(path: &str) -> (String, String) {
-    use std::path::Path;
-
-    let path = Path::new(path);
-
-    // 如果有父目录，认为是章节名
-    if let Some(parent) = path.parent() {
-        let chapter = parent
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or_default()
-            .to_string();
-        let file = path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or_default()
-            .to_string();
-        (chapter, file)
-    } else {
-        // 单文件漫画
-        (
-            "".to_string(),
-            path.file_name()
-                .and_then(|s| s.to_str())
-                .unwrap_or_default()
-                .to_string(),
-        )
-    }
-}
-
-/// 对章节进行排序
-///
-/// 使用自然排序对章节名进行排序。
-pub fn sort_chapters(chapters: &mut [String]) {
-    natural_sort_in_place(chapters);
-}
-
 /// 过滤出图像文件
 ///
 /// 从文件列表中筛选出支持的图像格式。
@@ -238,22 +136,6 @@ mod tests {
         assert_eq!(sorted, vec!["page_1.png", "page_2.png", "page_10.png"]);
     }
 
-    #[test]
-    fn test_smart_sort_cover_first() {
-        let files = vec![
-            "003.png".to_string(),
-            "cover.jpg".to_string(),
-            "001.png".to_string(),
-            "002.png".to_string(),
-        ];
-        let sorted = smart_sort(&files);
-        // 封面应该在最前面
-        assert_eq!(sorted[0], "cover.jpg");
-        // 其余按自然排序
-        assert_eq!(sorted[1], "001.png");
-        assert_eq!(sorted[2], "002.png");
-        assert_eq!(sorted[3], "003.png");
-    }
 
     #[test]
     fn test_filter_image_files() {
@@ -271,24 +153,6 @@ mod tests {
         assert!(filtered.contains(&"003.jpeg".to_string()));
     }
 
-    #[test]
-    fn test_extract_chapter_and_file() {
-        let (chapter, file) = extract_chapter_and_file("chapter_01/001.png");
-        assert_eq!(chapter, "chapter_01");
-        assert_eq!(file, "001.png");
 
-        let (chapter, file) = extract_chapter_and_file("single.cbz");
-        assert_eq!(chapter, "");
-        assert_eq!(file, "single.cbz");
-    }
-
-    #[test]
-    fn test_special_file_priority() {
-        assert_eq!(special_file_priority("cover.jpg"), 100);
-        assert_eq!(special_file_priority("封面.png"), 100);
-        assert_eq!(special_file_priority("index.txt"), 90);
-        assert_eq!(special_file_priority("目录.jpg"), 90);
-        assert_eq!(special_file_priority("color_page.png"), 80);
-        assert_eq!(special_file_priority("001.png"), 50);
-    }
 }
+

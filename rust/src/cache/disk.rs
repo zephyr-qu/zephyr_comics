@@ -51,8 +51,6 @@ pub struct DiskCache {
     entries: HashMap<String, CacheEntry>,
     /// 访问顺序 (用于 LRU)
     access_order: Vec<String>,
-    /// 配置
-    config: DiskCacheConfig,
 }
 
 /// 磁盘缓存配置
@@ -109,7 +107,6 @@ impl DiskCache {
             max_size,
             entries: HashMap::new(),
             access_order: Vec::new(),
-            config,
         };
 
         // 加载现有缓存元数据
@@ -708,3 +705,4 @@ mod tests {
         assert_ne!(hash1, hash3);
     }
 }
+

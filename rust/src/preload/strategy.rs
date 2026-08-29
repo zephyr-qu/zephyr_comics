@@ -249,98 +249,28 @@ impl PreloadStrategy {
     }
 }
 
-/// 预加载任务
-#[derive(Debug, Clone)]
-pub struct PreloadTask {
-    /// 文件路径
-    pub file_path: String,
-    /// 要预加载的页面索引
-    pub page_indices: Vec<usize>,
-    /// 优先级 (越小越高)
-    pub priority: u8,
-}
-
-impl PreloadTask {
-    pub fn new(file_path: String, page_indices: Vec<usize>) -> Self {
-        Self {
-            file_path,
-            page_indices,
-            priority: 0,
-        }
-    }
-
-    pub fn with_priority(mut self, priority: u8) -> Self {
-        self.priority = priority;
-        self
-    }
-}
-
 /// 预加载管理器
 ///
-/// 管理预加载任务的队列和执行。
+/// 只持有策略；任务队列已废弃——预取由 Dart 侧 ReaderSession 自带有界队列实现。
 pub struct PreloadManager {
-    /// 预加载策略
     strategy: PreloadStrategy,
-    /// 待处理的任务队列
-    task_queue: Vec<PreloadTask>,
-    /// 当前正在加载的任务
-    current_task: Option<PreloadTask>,
 }
 
 impl PreloadManager {
     /// 创建新的预加载管理器
     pub fn new(strategy: PreloadStrategy) -> Self {
-        Self {
-            strategy,
-            task_queue: Vec::new(),
-            current_task: None,
-        }
+        Self { strategy }
     }
 
-    /// 添加预加载任务
-    pub fn add_task(&mut self, task: PreloadTask) {
-        self.task_queue.push(task);
-        // 按优先级排序
-        self.task_queue.sort_by_key(|t| t.priority);
-    }
+    /// 取消占位：Dart 侧自管预取，保留签名供 FFI 兼容。
+    pub fn cancel_all(&mut self) {}
 
-    /// 取消所有待处理的预加载任务
-    pub fn cancel_all(&mut self) {
-        self.task_queue.clear();
-        self.current_task = None;
-    }
+    /// 取消占位：Dart 侧自管预取，保留签名供 FFI 兼容。
+    pub fn cancel_for_file(&mut self, _file_path: &str) {}
 
-    /// 取消指定文件的预加载任务
-    pub fn cancel_for_file(&mut self, file_path: &str) {
-        self.task_queue.retain(|t| t.file_path != file_path);
-        if let Some(ref current) = self.current_task {
-            if current.file_path == file_path {
-                self.current_task = None;
-            }
-        }
-    }
-
-    /// 获取下一个要执行的任务
-    pub fn next_task(&mut self) -> Option<PreloadTask> {
-        if self.task_queue.is_empty() {
-            return None;
-        }
-        Some(self.task_queue.remove(0))
-    }
-
-    /// 设置当前正在执行的任务
-    pub fn set_current_task(&mut self, task: Option<PreloadTask>) {
-        self.current_task = task;
-    }
-
-    /// 获取当前任务
-    pub fn get_current_task(&self) -> Option<&PreloadTask> {
-        self.current_task.as_ref()
-    }
-
-    /// 获取待处理任务数量
+    /// 待处理数量恒定为零：队列已废弃。
     pub fn pending_count(&self) -> usize {
-        self.task_queue.len()
+        0
     }
 
     /// 获取预加载策略
@@ -353,7 +283,6 @@ impl PreloadManager {
         self.strategy = strategy;
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -420,15 +349,6 @@ mod tests {
         assert!(pages.len() <= 2);
     }
 
-    #[test]
-    fn test_preload_manager() {
-        let strategy = PreloadStrategy::default();
-        let mut manager = PreloadManager::new(strategy);
-
-        manager.add_task(PreloadTask::new("comic.cbz".to_string(), vec![1, 2, 3]));
-        assert_eq!(manager.pending_count(), 1);
-
-        manager.cancel_all();
-        assert_eq!(manager.pending_count(), 0);
-    }
 }
+
+
