@@ -5,22 +5,40 @@ import '../../reading/reading_records.dart';
 import '../../signals/app_signals.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  const HistoryScreen({super.key, this.records, this.libraryEntries});
 
+  final ReadingRecords? records;
+
+  /// 库条目（path→entry 查找来源）；默认取全局 snapshot，
+  /// 注入后测试与宿主可脱离全局状态。
+  final List<ComicLibraryEntry>? libraryEntries;
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
   late Future<List<ReadingHistoryEntry>> _history;
+  late final ReadingRecords _records;
 
   @override
   void initState() {
     super.initState();
-    _history = readingRecords.history();
+    _records = widget.records ?? readingRecords;
+    _history = _records.history();
   }
 
-  void _reload() => setState(() => _history = readingRecords.history());
+  Future<void> _reload() async {
+    final history = _records.history();
+    setState(() {
+      _history = history;
+    });
+    await history;
+  }
+
+  Map<String, ComicLibraryEntry> _entriesByPath() {
+    final source = widget.libraryEntries ?? librarySnapshot.value.entries;
+    return {for (final entry in source) entry.path: entry};
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,13 +62,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
           if (entries.isEmpty) {
             return _message(context, '暂无阅读记录', '阅读漫画后，记录会出现在这里。');
           }
+          final entriesByPath = _entriesByPath();
           return RefreshIndicator(
-            onRefresh: () async => _reload(),
+            onRefresh: _reload,
             child: ListView.separated(
               itemCount: entries.length,
               separatorBuilder: (_, _) => const Divider(height: 1),
-              itemBuilder: (context, index) =>
-                  _HistoryTile(entry: entries[index], onDeleted: _reload),
+              itemBuilder: (context, index) => _HistoryTile(
+                entry: entries[index],
+                entryByPath: entriesByPath,
+                onDeleted: _reload,
+              ),
             ),
           );
         },
@@ -82,13 +104,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
 }
 
 class _HistoryTile extends StatelessWidget {
-  const _HistoryTile({required this.entry, required this.onDeleted});
+  const _HistoryTile({
+    required this.entry,
+    required this.entryByPath,
+    required this.onDeleted,
+  });
   final ReadingHistoryEntry entry;
+  final Map<String, ComicLibraryEntry> entryByPath;
   final VoidCallback onDeleted;
 
   @override
   Widget build(BuildContext context) {
-    final libraryEntry = _libraryEntryFor(entry.filePath);
+    final libraryEntry = entryByPath[entry.filePath];
     final title =
         libraryEntry?.title ?? entry.filePath.split(RegExp(r'[/\\]')).last;
     final totalPages = libraryEntry?.totalPages;
@@ -127,11 +154,4 @@ class _HistoryTile extends StatelessWidget {
   }
 
   String _date(DateTime value) => '${value.month}/${value.day}';
-
-  ComicLibraryEntry? _libraryEntryFor(String path) {
-    for (final item in librarySnapshot.value.entries) {
-      if (item.path == path) return item;
-    }
-    return null;
-  }
 }
