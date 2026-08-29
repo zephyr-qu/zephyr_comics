@@ -264,14 +264,8 @@ impl Default for LibraryScanner {
 
 /// 便捷函数：扫描目录并添加到数据库
 pub fn scan_directory_to_library(db: &LibraryDatabase, path: &str) -> Result<Vec<LibraryEntry>> {
-    let scanner = LibraryScanner::new();
-    let entries = scanner.scan_directory(path)?;
-
-    for entry in &entries {
-        db.add_to_library(entry)?;
-    }
-
-    Ok(entries)
+    scan_and_update_library(db, &[path.to_string()])?;
+    db.get_library_entries()
 }
 
 /// 便捷函数：扫描所有路径并更新数据库
@@ -493,6 +487,27 @@ mod tests {
         assert_eq!(first.len(), 1);
         db.add_to_library(&first[0]).unwrap();
         assert!(scanner.scan_incremental(&db).unwrap().is_empty());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn scan_directory_to_library_reconciles_removed_files() {
+        let dir = unique_temp_dir("reconcile");
+        let first = dir.join("first.cbz");
+        let second = dir.join("second.cbz");
+        write_cbz(&first, &[("001.png", b"not an image")]);
+        let db_path = dir.join("library.db");
+        let db = LibraryDatabase::new(Some(db_path)).unwrap();
+
+        let initial = scan_directory_to_library(&db, dir.to_str().unwrap()).unwrap();
+        assert_eq!(initial.len(), 1);
+
+        fs::remove_file(&first).unwrap();
+        write_cbz(&second, &[("001.png", b"not an image")]);
+        let refreshed = scan_directory_to_library(&db, dir.to_str().unwrap()).unwrap();
+
+        assert_eq!(refreshed.len(), 1);
+        assert_eq!(refreshed[0].file_path, normalize_path(&second));
         let _ = fs::remove_dir_all(dir);
     }
 }

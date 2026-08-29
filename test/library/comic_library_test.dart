@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zephyr_comics/library/comic_library.dart';
 
@@ -72,4 +74,31 @@ void main() {
       );
     },
   );
+
+  test('a stale refresh cannot overwrite a newer refresh', () async {
+    final first = Completer<List<ComicLibraryEntry>>();
+    final second = Completer<List<ComicLibraryEntry>>();
+    final adapter = _QueuedComicLibraryAdapter([first, second]);
+    final library = ComicLibrary(adapter: adapter);
+
+    final firstRefresh = library.refresh('/comics');
+    final secondRefresh = library.refresh('/comics');
+
+    second.complete([entry('New')]);
+    expect((await secondRefresh).entries.single.title, 'New');
+
+    first.complete([entry('Old')]);
+    expect((await firstRefresh).entries.single.title, 'New');
+    expect(library.snapshot.entries.single.title, 'New');
+  });
+}
+
+class _QueuedComicLibraryAdapter implements ComicLibraryAdapter {
+  _QueuedComicLibraryAdapter(this.requests);
+
+  final List<Completer<List<ComicLibraryEntry>>> requests;
+
+  @override
+  Future<List<ComicLibraryEntry>> scan(String rootPath) =>
+      requests.removeAt(0).future;
 }

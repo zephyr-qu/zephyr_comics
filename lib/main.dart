@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:zephyr_comics/src/rust/frb_generated.dart';
 import 'app.dart';
@@ -8,4 +10,5 @@ Future<void> main() async {
   await RustLib.init();
   await loadPreferences();
   runApp(const ZephyrApp());
+  unawaited(refreshLibraryIfConfigured());
 }

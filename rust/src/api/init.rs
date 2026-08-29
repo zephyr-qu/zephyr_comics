@@ -1,14 +1,12 @@
 //! 引擎全局初始化：缓存、解码器、预加载管理器与数据库引导。
 
-
-
-use flutter_rust_bridge::frb;
-use std::sync::{Arc, Mutex, OnceLock};
 use crate::cache::SharedImageCache;
 use crate::decoder::{DecoderConfig, ImageDecoder};
 use crate::disk_cache::{DiskCacheConfig, SharedDiskCache};
 use crate::library_db::init_global_db;
 use crate::preload_strategy::{PreloadManager, PreloadStrategy};
+use flutter_rust_bridge::frb;
+use std::sync::{Arc, Mutex, OnceLock};
 
 /// 全局缓存实例 (懒初始化)
 pub(crate) static IMAGE_CACHE: OnceLock<SharedImageCache> = OnceLock::new();

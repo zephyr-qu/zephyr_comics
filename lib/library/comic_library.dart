@@ -90,11 +90,14 @@ class ComicLibrary {
   final ComicLibraryAdapter adapter;
   LibrarySnapshot snapshot;
   List<ComicLibraryEntry> _allEntries;
+  int _refreshGeneration = 0;
 
   Future<LibrarySnapshot> refresh(String rootPath) async {
+    final generation = ++_refreshGeneration;
     snapshot = snapshot.copyWith(status: LibraryStatus.loading, message: null);
     try {
       final scanned = await adapter.scan(rootPath);
+      if (generation != _refreshGeneration) return snapshot;
       _allEntries = List.unmodifiable(scanned);
       final entries = _visible(_allEntries, snapshot.query, snapshot.sort);
       snapshot = snapshot.copyWith(
@@ -103,6 +106,7 @@ class ComicLibrary {
         message: null,
       );
     } catch (error) {
+      if (generation != _refreshGeneration) return snapshot;
       snapshot = snapshot.copyWith(
         status: LibraryStatus.warning,
         message: error.toString(),

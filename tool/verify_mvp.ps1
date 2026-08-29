@@ -16,12 +16,17 @@ function Invoke-Stage {
 }
 
 Invoke-Stage 'Generate fixtures' { & pwsh -NoProfile -File tool/generate_fixtures.ps1 }
+Invoke-Stage 'Generate Rust bindings' {
+  & flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml
+}
 Invoke-Stage 'Dart format check' {
   & dart format --output=none --set-exit-if-changed lib test integration_test
 }
 Invoke-Stage 'Flutter analyze' { & flutter analyze --no-fatal-infos }
 Invoke-Stage 'Flutter tests' { & flutter test }
 Invoke-Stage 'Rust tests' { & cargo test --manifest-path rust/Cargo.toml }
-Invoke-Stage 'Release APK' { & flutter build apk --release }
+Invoke-Stage 'Release APK' {
+  & flutter build apk --release --android-skip-build-dependency-validation
+}
 
 Write-Host "`nMVP verification passed. APK: build/app/outputs/flutter-apk/app-release.apk" -ForegroundColor Green

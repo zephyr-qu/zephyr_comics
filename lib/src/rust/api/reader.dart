@@ -3,22 +3,14 @@
 
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
-import '../archive_cache.dart';
-import '../cache.dart';
-import '../disk_cache.dart';
 import '../frb_generated.dart';
-import '../library_db.dart';
 import '../metadata.dart';
-import '../preload_strategy.dart';
-import '../reading_progress.dart';
+import '../preload/strategy.dart';
 import '../types.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `encode_page_png`, `extract_page_image_encoded`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
-
-/// 获取缓存统计信息
-CacheStats getCacheStats() => RustLib.instance.api.crateApiComicGetCacheStats();
 
 /// 获取漫画文件信息
 ///
@@ -27,7 +19,7 @@ CacheStats getCacheStats() => RustLib.instance.api.crateApiComicGetCacheStats();
 /// # 参数
 /// * `file_path` - 漫画文件路径 (CBZ/CBR/PDF)
 ComicInfo getComicInfo({required String filePath}) =>
-    RustLib.instance.api.crateApiComicGetComicInfo(filePath: filePath);
+    RustLib.instance.api.crateApiReaderGetComicInfo(filePath: filePath);
 
 /// 获取指定页的图片数据
 ///
@@ -46,7 +38,7 @@ Future<ImageData> getPageImage({
   required int pageIndex,
   required int maxWidth,
   required int maxHeight,
-}) => RustLib.instance.api.crateApiComicGetPageImage(
+}) => RustLib.instance.api.crateApiReaderGetPageImage(
   filePath: filePath,
   pageIndex: pageIndex,
   maxWidth: maxWidth,
@@ -59,7 +51,7 @@ Future<EncodedPage> getPageImagePng({
   required int pageIndex,
   required int maxWidth,
   required int maxHeight,
-}) => RustLib.instance.api.crateApiComicGetPageImagePng(
+}) => RustLib.instance.api.crateApiReaderGetPageImagePng(
   filePath: filePath,
   pageIndex: pageIndex,
   maxWidth: maxWidth,
@@ -74,7 +66,7 @@ Future<EncodedPage> getPageImagePng({
 Future<Uint8List> getPageImageEncoded({
   required String filePath,
   required int pageIndex,
-}) => RustLib.instance.api.crateApiComicGetPageImageEncoded(
+}) => RustLib.instance.api.crateApiReaderGetPageImageEncoded(
   filePath: filePath,
   pageIndex: pageIndex,
 );
@@ -90,7 +82,7 @@ Future<ZeroCopyImageData> getPageImageZeroCopy({
   required int pageIndex,
   required int maxWidth,
   required int maxHeight,
-}) => RustLib.instance.api.crateApiComicGetPageImageZeroCopy(
+}) => RustLib.instance.api.crateApiReaderGetPageImageZeroCopy(
   filePath: filePath,
   pageIndex: pageIndex,
   maxWidth: maxWidth,
@@ -107,7 +99,7 @@ Future<ZeroCopyImageData> getPageImageZeroCopy({
 Future<ThumbnailData> generateThumbnail({
   required String filePath,
   required int size,
-}) => RustLib.instance.api.crateApiComicGenerateThumbnail(
+}) => RustLib.instance.api.crateApiReaderGenerateThumbnail(
   filePath: filePath,
   size: size,
 );
@@ -126,60 +118,36 @@ Future<List<ImageData>> preloadPages({
   required List<int> pageIndices,
   required int maxWidth,
   required int maxHeight,
-}) => RustLib.instance.api.crateApiComicPreloadPages(
+}) => RustLib.instance.api.crateApiReaderPreloadPages(
   filePath: filePath,
   pageIndices: pageIndices,
   maxWidth: maxWidth,
   maxHeight: maxHeight,
 );
 
-/// 清除缓存
-///
-/// 释放所有缓存的图片数据。
-void clearCache() => RustLib.instance.api.crateApiComicClearCache();
-
 /// 检查文件是否为有效的漫画格式
 ///
 /// # 参数
 /// * `file_path` - 文件路径
 bool isValidComic({required String filePath}) =>
-    RustLib.instance.api.crateApiComicIsValidComic(filePath: filePath);
+    RustLib.instance.api.crateApiReaderIsValidComic(filePath: filePath);
 
 /// 获取支持的漫画格式列表
 List<String> getSupportedFormats() =>
-    RustLib.instance.api.crateApiComicGetSupportedFormats();
-
-/// 设置缓存大小限制
-///
-/// # 参数
-/// * `max_memory_mb` - 最大内存占用 (MB)
-void setCacheLimit({required int maxMemoryMb}) =>
-    RustLib.instance.api.crateApiComicSetCacheLimit(maxMemoryMb: maxMemoryMb);
-
-/// 获取磁盘缓存统计信息
-DiskCacheStats getDiskCacheStats() =>
-    RustLib.instance.api.crateApiComicGetDiskCacheStats();
-
-/// 清除磁盘缓存
-void clearDiskCache() => RustLib.instance.api.crateApiComicClearDiskCache();
-
-/// 设置磁盘缓存大小限制
-///
-/// # 注意
-/// 此设置需要在初始化时生效，运行时修改需要重新初始化
-void setDiskCacheLimit({required int maxSizeMb}) =>
-    RustLib.instance.api.crateApiComicSetDiskCacheLimit(maxSizeMb: maxSizeMb);
+    RustLib.instance.api.crateApiReaderGetSupportedFormats();
 
 /// 设置阅读方向
 ///
 /// # 参数
 /// * `direction` - 阅读方向
-void setReadingDirection({required ReadingDirection direction}) =>
-    RustLib.instance.api.crateApiComicSetReadingDirection(direction: direction);
+void setReadingDirection({required ReadingDirection direction}) => RustLib
+    .instance
+    .api
+    .crateApiReaderSetReadingDirection(direction: direction);
 
 /// 获取当前阅读方向
 ReadingDirection getReadingDirection() =>
-    RustLib.instance.api.crateApiComicGetReadingDirection();
+    RustLib.instance.api.crateApiReaderGetReadingDirection();
 
 /// 计算需要预加载的页面
 ///
@@ -191,7 +159,7 @@ Uint64List calculatePreloadPages({
   required BigInt currentPage,
   required BigInt totalPages,
   required ReadingDirection direction,
-}) => RustLib.instance.api.crateApiComicCalculatePreloadPages(
+}) => RustLib.instance.api.crateApiReaderCalculatePreloadPages(
   currentPage: currentPage,
   totalPages: totalPages,
   direction: direction,
@@ -207,7 +175,7 @@ Uint64List calculateSmartPreloadPages({
   required BigInt currentPage,
   required BigInt totalPages,
   required BigInt readingSpeedMs,
-}) => RustLib.instance.api.crateApiComicCalculateSmartPreloadPages(
+}) => RustLib.instance.api.crateApiReaderCalculateSmartPreloadPages(
   currentPage: currentPage,
   totalPages: totalPages,
   readingSpeedMs: readingSpeedMs,
@@ -223,7 +191,7 @@ void setPreloadStrategy({
   required int baseCount,
   required int maxCount,
   required bool enableSmart,
-}) => RustLib.instance.api.crateApiComicSetPreloadStrategy(
+}) => RustLib.instance.api.crateApiReaderSetPreloadStrategy(
   baseCount: baseCount,
   maxCount: maxCount,
   enableSmart: enableSmart,
@@ -237,7 +205,7 @@ void setPreloadStrategy({
 BigInt? getNextPage({
   required BigInt currentPage,
   required BigInt totalPages,
-}) => RustLib.instance.api.crateApiComicGetNextPage(
+}) => RustLib.instance.api.crateApiReaderGetNextPage(
   currentPage: currentPage,
   totalPages: totalPages,
 );
@@ -250,14 +218,14 @@ BigInt? getNextPage({
 BigInt? getPrevPage({
   required BigInt currentPage,
   required BigInt totalPages,
-}) => RustLib.instance.api.crateApiComicGetPrevPage(
+}) => RustLib.instance.api.crateApiReaderGetPrevPage(
   currentPage: currentPage,
   totalPages: totalPages,
 );
 
 /// 取消所有预加载任务
 void cancelAllPreloadTasks() =>
-    RustLib.instance.api.crateApiComicCancelAllPreloadTasks();
+    RustLib.instance.api.crateApiReaderCancelAllPreloadTasks();
 
 /// 取消指定文件的预加载任务
 ///
@@ -266,146 +234,18 @@ void cancelAllPreloadTasks() =>
 void cancelPreloadTasksForFile({required String filePath}) => RustLib
     .instance
     .api
-    .crateApiComicCancelPreloadTasksForFile(filePath: filePath);
+    .crateApiReaderCancelPreloadTasksForFile(filePath: filePath);
 
 /// 获取待处理预加载任务数量
 BigInt getPendingPreloadTasks() =>
-    RustLib.instance.api.crateApiComicGetPendingPreloadTasks();
-
-/// 保存阅读进度
-///
-/// # 参数
-/// * `progress` - 阅读进度信息
-void saveReadingProgress({required ReadingProgress progress}) =>
-    RustLib.instance.api.crateApiComicSaveReadingProgress(progress: progress);
-
-/// 获取阅读进度
-///
-/// # 参数
-/// * `file_path` - 文件路径
-ReadingProgress? getReadingProgress({required String filePath}) =>
-    RustLib.instance.api.crateApiComicGetReadingProgress(filePath: filePath);
-
-/// 获取阅读历史
-///
-/// # 参数
-/// * `limit` - 返回数量限制
-List<ReadingProgress> getReadingHistory({required int limit}) =>
-    RustLib.instance.api.crateApiComicGetReadingHistory(limit: limit);
-
-/// Hide one history entry without deleting its progress or bookmarks.
-void hideReadingHistory({required String filePath}) =>
-    RustLib.instance.api.crateApiComicHideReadingHistory(filePath: filePath);
-
-/// 删除阅读进度
-///
-/// # 参数
-/// * `file_path` - 文件路径
-void removeReadingProgress({required String filePath}) =>
-    RustLib.instance.api.crateApiComicRemoveReadingProgress(filePath: filePath);
-
-/// 添加书签
-///
-/// # 参数
-/// * `file_path` - 文件路径
-/// * `page_index` - 页面索引
-/// * `note` - 备注 (可选)
-Bookmark addBookmark({
-  required String filePath,
-  required int pageIndex,
-  String? note,
-}) => RustLib.instance.api.crateApiComicAddBookmark(
-  filePath: filePath,
-  pageIndex: pageIndex,
-  note: note,
-);
-
-/// 移除书签
-///
-/// # 参数
-/// * `file_path` - 文件路径
-/// * `page_index` - 页面索引
-void removeBookmark({required String filePath, required int pageIndex}) =>
-    RustLib.instance.api.crateApiComicRemoveBookmark(
-      filePath: filePath,
-      pageIndex: pageIndex,
-    );
-
-/// 获取书签列表
-///
-/// # 参数
-/// * `file_path` - 文件路径
-List<Bookmark> getBookmarks({required String filePath}) =>
-    RustLib.instance.api.crateApiComicGetBookmarks(filePath: filePath);
-
-/// 获取所有书签
-List<Bookmark> getAllBookmarks() =>
-    RustLib.instance.api.crateApiComicGetAllBookmarks();
-
-/// 获取阅读统计
-ReadingStats getReadingStats() =>
-    RustLib.instance.api.crateApiComicGetReadingStats();
+    RustLib.instance.api.crateApiReaderGetPendingPreloadTasks();
 
 /// 提取漫画元数据
 ///
 /// # 参数
 /// * `file_path` - 文件路径
 ComicMetadata extractComicMetadata({required String filePath}) =>
-    RustLib.instance.api.crateApiComicExtractComicMetadata(filePath: filePath);
-
-/// 扫描目录添加到图书馆
-///
-/// # 参数
-/// * `path` - 目录路径
-List<LibraryEntry> scanDirectoryToLibrary({required String path}) =>
-    RustLib.instance.api.crateApiComicScanDirectoryToLibrary(path: path);
-
-/// 获取图书馆所有漫画
-List<LibraryEntry> getLibraryEntries() =>
-    RustLib.instance.api.crateApiComicGetLibraryEntries();
-
-/// 搜索图书馆
-///
-/// # 参数
-/// * `query` - 搜索关键词
-List<LibraryEntry> searchLibrary({required String query}) =>
-    RustLib.instance.api.crateApiComicSearchLibrary(query: query);
-
-/// 获取最近添加的漫画
-///
-/// # 参数
-/// * `limit` - 返回数量限制
-List<LibraryEntry> getRecentlyAdded({required int limit}) =>
-    RustLib.instance.api.crateApiComicGetRecentlyAdded(limit: limit);
-
-/// 从图书馆移除
-///
-/// # 参数
-/// * `file_path` - 文件路径
-void removeFromLibrary({required String filePath}) =>
-    RustLib.instance.api.crateApiComicRemoveFromLibrary(filePath: filePath);
-
-/// 更新最后打开时间
-///
-/// # 参数
-/// * `file_path` - 文件路径
-void updateLastOpened({required String filePath}) =>
-    RustLib.instance.api.crateApiComicUpdateLastOpened(filePath: filePath);
-
-/// 设置压缩包缓存大小
-///
-/// # 参数
-/// * `max_handles` - 最大缓存句柄数 (推荐 5-10)
-void setArchiveCacheSize({required int maxHandles}) => RustLib.instance.api
-    .crateApiComicSetArchiveCacheSize(maxHandles: maxHandles);
-
-/// 获取压缩包缓存统计
-ArchiveCacheStats getArchiveCacheStats() =>
-    RustLib.instance.api.crateApiComicGetArchiveCacheStats();
-
-/// 清空压缩包缓存
-void clearArchiveCache() =>
-    RustLib.instance.api.crateApiComicClearArchiveCache();
+    RustLib.instance.api.crateApiReaderExtractComicMetadata(filePath: filePath);
 
 /// 零拷贝图像数据
 ///

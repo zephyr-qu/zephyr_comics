@@ -10,8 +10,10 @@
 
 /// 阅读方向
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum ReadingDirection {
     /// 左到右 (美漫/国漫)
+    #[default]
     LeftToRight,
     /// 右到左 (日漫)
     RightToLeft,
@@ -21,11 +23,6 @@ pub enum ReadingDirection {
     Auto,
 }
 
-impl Default for ReadingDirection {
-    fn default() -> Self {
-        Self::LeftToRight
-    }
-}
 
 /// 预加载策略配置
 #[derive(Debug, Clone)]

@@ -1,12 +1,12 @@
 //! 内存/磁盘/压缩包缓存的统计、限值与清理接口。
 
-
-
-use flutter_rust_bridge::frb;
-use crate::archive_cache::{clear_global_cache, get_global_cache_stats, set_global_cache_size, ArchiveCacheStats};
+use crate::api::init::{DEFAULT_CACHE_SIZE_MB, DISK_CACHE, IMAGE_CACHE};
+use crate::archive_cache::{
+    clear_global_cache, get_global_cache_stats, set_global_cache_size, ArchiveCacheStats,
+};
 use crate::disk_cache::DiskCacheStats;
 use crate::error::{ComicError, Result};
-use crate::api::init::{IMAGE_CACHE, DISK_CACHE, DEFAULT_CACHE_SIZE_MB};
+use flutter_rust_bridge::frb;
 
 /// 获取缓存统计信息
 #[frb(sync)]
@@ -112,8 +112,8 @@ pub fn clear_archive_cache() {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::init::init_app;
     use super::*;
+    use crate::api::init::init_app;
 
     #[test]
     fn test_cache_stats() {
@@ -139,4 +139,3 @@ mod tests {
         assert_eq!(stats.max_handles, 10);
     }
 }
-

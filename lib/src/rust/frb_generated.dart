@@ -3,21 +3,24 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
-import 'api/comic.dart';
+import 'api/cache.dart';
+import 'api/library.dart';
+import 'api/progress.dart';
+import 'api/reader.dart';
 import 'api/simple.dart';
-import 'archive_cache.dart';
-import 'cache.dart';
+import 'cache/archive.dart';
+import 'cache/disk.dart';
+import 'cache/memory.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'disk_cache.dart';
 import 'frb_generated.dart';
 import 'frb_generated.io.dart'
     if (dart.library.js_interop) 'frb_generated.web.dart';
-import 'library_db.dart';
+import 'library/db.dart';
+import 'library/progress.dart';
 import 'metadata.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
-import 'preload_strategy.dart';
-import 'reading_progress.dart';
+import 'preload/strategy.dart';
 import 'types.dart';
 
 /// Main entrypoint of the Rust API
@@ -64,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 
   @override
   Future<void> executeRustInitializers() async {
-    await api.crateApiComicInitApp();
+    await api.crateApiInitInitApp();
   }
 
   @override
@@ -75,7 +78,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -884794963;
+  int get rustContentHash => 1375529277;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -87,154 +90,162 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
-  Bookmark crateApiComicAddBookmark({
+  Bookmark crateApiProgressAddBookmark({
     required String filePath,
     required int pageIndex,
     String? note,
   });
 
-  Uint64List crateApiComicCalculatePreloadPages({
+  Uint64List crateApiReaderCalculatePreloadPages({
     required BigInt currentPage,
     required BigInt totalPages,
     required ReadingDirection direction,
   });
 
-  Uint64List crateApiComicCalculateSmartPreloadPages({
+  Uint64List crateApiReaderCalculateSmartPreloadPages({
     required BigInt currentPage,
     required BigInt totalPages,
     required BigInt readingSpeedMs,
   });
 
-  void crateApiComicCancelAllPreloadTasks();
+  void crateApiReaderCancelAllPreloadTasks();
 
-  void crateApiComicCancelPreloadTasksForFile({required String filePath});
+  void crateApiReaderCancelPreloadTasksForFile({required String filePath});
 
-  void crateApiComicClearArchiveCache();
+  void crateApiCacheClearArchiveCache();
 
-  void crateApiComicClearCache();
+  void crateApiCacheClearCache();
 
-  void crateApiComicClearDiskCache();
+  void crateApiCacheClearDiskCache();
 
-  ComicMetadata crateApiComicExtractComicMetadata({required String filePath});
+  ComicMetadata crateApiReaderExtractComicMetadata({required String filePath});
 
-  Future<ThumbnailData> crateApiComicGenerateThumbnail({
+  Future<ThumbnailData> crateApiReaderGenerateThumbnail({
     required String filePath,
     required int size,
   });
 
-  List<Bookmark> crateApiComicGetAllBookmarks();
+  List<Bookmark> crateApiProgressGetAllBookmarks();
 
-  ArchiveCacheStats crateApiComicGetArchiveCacheStats();
+  ArchiveCacheStats crateApiCacheGetArchiveCacheStats();
 
-  List<Bookmark> crateApiComicGetBookmarks({required String filePath});
+  List<Bookmark> crateApiProgressGetBookmarks({required String filePath});
 
-  CacheStats crateApiComicGetCacheStats();
+  CacheStats crateApiCacheGetCacheStats();
 
-  ComicInfo crateApiComicGetComicInfo({required String filePath});
+  ComicInfo crateApiReaderGetComicInfo({required String filePath});
 
-  DiskCacheStats crateApiComicGetDiskCacheStats();
+  DiskCacheStats crateApiCacheGetDiskCacheStats();
 
-  List<LibraryEntry> crateApiComicGetLibraryEntries();
+  List<LibraryEntry> crateApiLibraryGetLibraryEntries();
 
-  BigInt? crateApiComicGetNextPage({
+  BigInt? crateApiReaderGetNextPage({
     required BigInt currentPage,
     required BigInt totalPages,
   });
 
-  Future<ImageData> crateApiComicGetPageImage({
+  Future<ImageData> crateApiReaderGetPageImage({
     required String filePath,
     required int pageIndex,
     required int maxWidth,
     required int maxHeight,
   });
 
-  Future<Uint8List> crateApiComicGetPageImageEncoded({
+  Future<Uint8List> crateApiReaderGetPageImageEncoded({
     required String filePath,
     required int pageIndex,
   });
 
-  Future<EncodedPage> crateApiComicGetPageImagePng({
-    required String filePath,
-    required int pageIndex,
-    required int maxWidth,
-    required int maxHeight,
-  });
-
-  Future<ZeroCopyImageData> crateApiComicGetPageImageZeroCopy({
+  Future<EncodedPage> crateApiReaderGetPageImagePng({
     required String filePath,
     required int pageIndex,
     required int maxWidth,
     required int maxHeight,
   });
 
-  BigInt crateApiComicGetPendingPreloadTasks();
+  Future<ZeroCopyImageData> crateApiReaderGetPageImageZeroCopy({
+    required String filePath,
+    required int pageIndex,
+    required int maxWidth,
+    required int maxHeight,
+  });
 
-  BigInt? crateApiComicGetPrevPage({
+  BigInt crateApiReaderGetPendingPreloadTasks();
+
+  BigInt? crateApiReaderGetPrevPage({
     required BigInt currentPage,
     required BigInt totalPages,
   });
 
-  ReadingDirection crateApiComicGetReadingDirection();
+  ReadingDirection crateApiReaderGetReadingDirection();
 
-  List<ReadingProgress> crateApiComicGetReadingHistory({required int limit});
+  Future<List<ReadingProgress>> crateApiProgressGetReadingHistory({
+    required int limit,
+  });
 
-  ReadingProgress? crateApiComicGetReadingProgress({required String filePath});
+  ReadingProgress? crateApiProgressGetReadingProgress({
+    required String filePath,
+  });
 
-  ReadingStats crateApiComicGetReadingStats();
+  ReadingStats crateApiProgressGetReadingStats();
 
-  List<LibraryEntry> crateApiComicGetRecentlyAdded({required int limit});
+  List<LibraryEntry> crateApiLibraryGetRecentlyAdded({required int limit});
 
-  List<String> crateApiComicGetSupportedFormats();
+  List<String> crateApiReaderGetSupportedFormats();
 
   String crateApiSimpleGreet({required String name});
 
-  void crateApiComicHideReadingHistory({required String filePath});
+  void crateApiProgressHideReadingHistory({required String filePath});
 
-  Future<void> crateApiComicInitApp();
+  Future<void> crateApiInitInitApp();
 
   Future<void> crateApiSimpleInitApp();
 
-  bool crateApiComicIsValidComic({required String filePath});
+  bool crateApiReaderIsValidComic({required String filePath});
 
-  Future<List<ImageData>> crateApiComicPreloadPages({
+  Future<List<ImageData>> crateApiReaderPreloadPages({
     required String filePath,
     required List<int> pageIndices,
     required int maxWidth,
     required int maxHeight,
   });
 
-  void crateApiComicRemoveBookmark({
+  void crateApiProgressRemoveBookmark({
     required String filePath,
     required int pageIndex,
   });
 
-  void crateApiComicRemoveFromLibrary({required String filePath});
+  void crateApiLibraryRemoveFromLibrary({required String filePath});
 
-  void crateApiComicRemoveReadingProgress({required String filePath});
+  void crateApiProgressRemoveReadingProgress({required String filePath});
 
-  void crateApiComicSaveReadingProgress({required ReadingProgress progress});
+  void crateApiProgressSaveReadingProgress({
+    required String filePath,
+    required BigInt pageIndex,
+    required BigInt totalPages,
+  });
 
-  List<LibraryEntry> crateApiComicScanDirectoryToLibrary({
+  Future<List<LibraryEntry>> crateApiLibraryScanDirectoryToLibrary({
     required String path,
   });
 
-  List<LibraryEntry> crateApiComicSearchLibrary({required String query});
+  List<LibraryEntry> crateApiLibrarySearchLibrary({required String query});
 
-  void crateApiComicSetArchiveCacheSize({required int maxHandles});
+  void crateApiCacheSetArchiveCacheSize({required int maxHandles});
 
-  void crateApiComicSetCacheLimit({required int maxMemoryMb});
+  void crateApiCacheSetCacheLimit({required int maxMemoryMb});
 
-  void crateApiComicSetDiskCacheLimit({required int maxSizeMb});
+  void crateApiCacheSetDiskCacheLimit({required int maxSizeMb});
 
-  void crateApiComicSetPreloadStrategy({
+  void crateApiReaderSetPreloadStrategy({
     required int baseCount,
     required int maxCount,
     required bool enableSmart,
   });
 
-  void crateApiComicSetReadingDirection({required ReadingDirection direction});
+  void crateApiReaderSetReadingDirection({required ReadingDirection direction});
 
-  void crateApiComicUpdateLastOpened({required String filePath});
+  void crateApiLibraryUpdateLastOpened({required String filePath});
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -246,7 +257,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
-  Bookmark crateApiComicAddBookmark({
+  Bookmark crateApiProgressAddBookmark({
     required String filePath,
     required int pageIndex,
     String? note,
@@ -264,20 +275,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_bookmark,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicAddBookmarkConstMeta,
+        constMeta: kCrateApiProgressAddBookmarkConstMeta,
         argValues: [filePath, pageIndex, note],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicAddBookmarkConstMeta => const TaskConstMeta(
-    debugName: "add_bookmark",
-    argNames: ["filePath", "pageIndex", "note"],
-  );
+  TaskConstMeta get kCrateApiProgressAddBookmarkConstMeta =>
+      const TaskConstMeta(
+        debugName: "add_bookmark",
+        argNames: ["filePath", "pageIndex", "note"],
+      );
 
   @override
-  Uint64List crateApiComicCalculatePreloadPages({
+  Uint64List crateApiReaderCalculatePreloadPages({
     required BigInt currentPage,
     required BigInt totalPages,
     required ReadingDirection direction,
@@ -295,21 +307,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_list_prim_usize_strict,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicCalculatePreloadPagesConstMeta,
+        constMeta: kCrateApiReaderCalculatePreloadPagesConstMeta,
         argValues: [currentPage, totalPages, direction],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicCalculatePreloadPagesConstMeta =>
+  TaskConstMeta get kCrateApiReaderCalculatePreloadPagesConstMeta =>
       const TaskConstMeta(
         debugName: "calculate_preload_pages",
         argNames: ["currentPage", "totalPages", "direction"],
       );
 
   @override
-  Uint64List crateApiComicCalculateSmartPreloadPages({
+  Uint64List crateApiReaderCalculateSmartPreloadPages({
     required BigInt currentPage,
     required BigInt totalPages,
     required BigInt readingSpeedMs,
@@ -327,21 +339,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_list_prim_usize_strict,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicCalculateSmartPreloadPagesConstMeta,
+        constMeta: kCrateApiReaderCalculateSmartPreloadPagesConstMeta,
         argValues: [currentPage, totalPages, readingSpeedMs],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicCalculateSmartPreloadPagesConstMeta =>
+  TaskConstMeta get kCrateApiReaderCalculateSmartPreloadPagesConstMeta =>
       const TaskConstMeta(
         debugName: "calculate_smart_preload_pages",
         argNames: ["currentPage", "totalPages", "readingSpeedMs"],
       );
 
   @override
-  void crateApiComicCancelAllPreloadTasks() {
+  void crateApiReaderCancelAllPreloadTasks() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -352,18 +364,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicCancelAllPreloadTasksConstMeta,
+        constMeta: kCrateApiReaderCancelAllPreloadTasksConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicCancelAllPreloadTasksConstMeta =>
+  TaskConstMeta get kCrateApiReaderCancelAllPreloadTasksConstMeta =>
       const TaskConstMeta(debugName: "cancel_all_preload_tasks", argNames: []);
 
   @override
-  void crateApiComicCancelPreloadTasksForFile({required String filePath}) {
+  void crateApiReaderCancelPreloadTasksForFile({required String filePath}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -375,21 +387,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicCancelPreloadTasksForFileConstMeta,
+        constMeta: kCrateApiReaderCancelPreloadTasksForFileConstMeta,
         argValues: [filePath],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicCancelPreloadTasksForFileConstMeta =>
+  TaskConstMeta get kCrateApiReaderCancelPreloadTasksForFileConstMeta =>
       const TaskConstMeta(
         debugName: "cancel_preload_tasks_for_file",
         argNames: ["filePath"],
       );
 
   @override
-  void crateApiComicClearArchiveCache() {
+  void crateApiCacheClearArchiveCache() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -400,18 +412,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicClearArchiveCacheConstMeta,
+        constMeta: kCrateApiCacheClearArchiveCacheConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicClearArchiveCacheConstMeta =>
+  TaskConstMeta get kCrateApiCacheClearArchiveCacheConstMeta =>
       const TaskConstMeta(debugName: "clear_archive_cache", argNames: []);
 
   @override
-  void crateApiComicClearCache() {
+  void crateApiCacheClearCache() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -422,18 +434,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicClearCacheConstMeta,
+        constMeta: kCrateApiCacheClearCacheConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicClearCacheConstMeta =>
+  TaskConstMeta get kCrateApiCacheClearCacheConstMeta =>
       const TaskConstMeta(debugName: "clear_cache", argNames: []);
 
   @override
-  void crateApiComicClearDiskCache() {
+  void crateApiCacheClearDiskCache() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -444,18 +456,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicClearDiskCacheConstMeta,
+        constMeta: kCrateApiCacheClearDiskCacheConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicClearDiskCacheConstMeta =>
+  TaskConstMeta get kCrateApiCacheClearDiskCacheConstMeta =>
       const TaskConstMeta(debugName: "clear_disk_cache", argNames: []);
 
   @override
-  ComicMetadata crateApiComicExtractComicMetadata({required String filePath}) {
+  ComicMetadata crateApiReaderExtractComicMetadata({required String filePath}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -467,21 +479,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_comic_metadata,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicExtractComicMetadataConstMeta,
+        constMeta: kCrateApiReaderExtractComicMetadataConstMeta,
         argValues: [filePath],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicExtractComicMetadataConstMeta =>
+  TaskConstMeta get kCrateApiReaderExtractComicMetadataConstMeta =>
       const TaskConstMeta(
         debugName: "extract_comic_metadata",
         argNames: ["filePath"],
       );
 
   @override
-  Future<ThumbnailData> crateApiComicGenerateThumbnail({
+  Future<ThumbnailData> crateApiReaderGenerateThumbnail({
     required String filePath,
     required int size,
   }) {
@@ -502,21 +514,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_thumbnail_data,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicGenerateThumbnailConstMeta,
+        constMeta: kCrateApiReaderGenerateThumbnailConstMeta,
         argValues: [filePath, size],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGenerateThumbnailConstMeta =>
+  TaskConstMeta get kCrateApiReaderGenerateThumbnailConstMeta =>
       const TaskConstMeta(
         debugName: "generate_thumbnail",
         argNames: ["filePath", "size"],
       );
 
   @override
-  List<Bookmark> crateApiComicGetAllBookmarks() {
+  List<Bookmark> crateApiProgressGetAllBookmarks() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -527,18 +539,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_list_bookmark,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetAllBookmarksConstMeta,
+        constMeta: kCrateApiProgressGetAllBookmarksConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetAllBookmarksConstMeta =>
+  TaskConstMeta get kCrateApiProgressGetAllBookmarksConstMeta =>
       const TaskConstMeta(debugName: "get_all_bookmarks", argNames: []);
 
   @override
-  ArchiveCacheStats crateApiComicGetArchiveCacheStats() {
+  ArchiveCacheStats crateApiCacheGetArchiveCacheStats() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -549,18 +561,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_archive_cache_stats,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetArchiveCacheStatsConstMeta,
+        constMeta: kCrateApiCacheGetArchiveCacheStatsConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetArchiveCacheStatsConstMeta =>
+  TaskConstMeta get kCrateApiCacheGetArchiveCacheStatsConstMeta =>
       const TaskConstMeta(debugName: "get_archive_cache_stats", argNames: []);
 
   @override
-  List<Bookmark> crateApiComicGetBookmarks({required String filePath}) {
+  List<Bookmark> crateApiProgressGetBookmarks({required String filePath}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -572,18 +584,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_list_bookmark,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetBookmarksConstMeta,
+        constMeta: kCrateApiProgressGetBookmarksConstMeta,
         argValues: [filePath],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetBookmarksConstMeta =>
+  TaskConstMeta get kCrateApiProgressGetBookmarksConstMeta =>
       const TaskConstMeta(debugName: "get_bookmarks", argNames: ["filePath"]);
 
   @override
-  CacheStats crateApiComicGetCacheStats() {
+  CacheStats crateApiCacheGetCacheStats() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -594,18 +606,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_cache_stats,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetCacheStatsConstMeta,
+        constMeta: kCrateApiCacheGetCacheStatsConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetCacheStatsConstMeta =>
+  TaskConstMeta get kCrateApiCacheGetCacheStatsConstMeta =>
       const TaskConstMeta(debugName: "get_cache_stats", argNames: []);
 
   @override
-  ComicInfo crateApiComicGetComicInfo({required String filePath}) {
+  ComicInfo crateApiReaderGetComicInfo({required String filePath}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -617,18 +629,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_comic_info,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicGetComicInfoConstMeta,
+        constMeta: kCrateApiReaderGetComicInfoConstMeta,
         argValues: [filePath],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetComicInfoConstMeta =>
+  TaskConstMeta get kCrateApiReaderGetComicInfoConstMeta =>
       const TaskConstMeta(debugName: "get_comic_info", argNames: ["filePath"]);
 
   @override
-  DiskCacheStats crateApiComicGetDiskCacheStats() {
+  DiskCacheStats crateApiCacheGetDiskCacheStats() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -639,18 +651,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_disk_cache_stats,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetDiskCacheStatsConstMeta,
+        constMeta: kCrateApiCacheGetDiskCacheStatsConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetDiskCacheStatsConstMeta =>
+  TaskConstMeta get kCrateApiCacheGetDiskCacheStatsConstMeta =>
       const TaskConstMeta(debugName: "get_disk_cache_stats", argNames: []);
 
   @override
-  List<LibraryEntry> crateApiComicGetLibraryEntries() {
+  List<LibraryEntry> crateApiLibraryGetLibraryEntries() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -661,18 +673,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_list_library_entry,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetLibraryEntriesConstMeta,
+        constMeta: kCrateApiLibraryGetLibraryEntriesConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetLibraryEntriesConstMeta =>
+  TaskConstMeta get kCrateApiLibraryGetLibraryEntriesConstMeta =>
       const TaskConstMeta(debugName: "get_library_entries", argNames: []);
 
   @override
-  BigInt? crateApiComicGetNextPage({
+  BigInt? crateApiReaderGetNextPage({
     required BigInt currentPage,
     required BigInt totalPages,
   }) {
@@ -688,20 +700,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_opt_box_autoadd_usize,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetNextPageConstMeta,
+        constMeta: kCrateApiReaderGetNextPageConstMeta,
         argValues: [currentPage, totalPages],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetNextPageConstMeta => const TaskConstMeta(
+  TaskConstMeta get kCrateApiReaderGetNextPageConstMeta => const TaskConstMeta(
     debugName: "get_next_page",
     argNames: ["currentPage", "totalPages"],
   );
 
   @override
-  Future<ImageData> crateApiComicGetPageImage({
+  Future<ImageData> crateApiReaderGetPageImage({
     required String filePath,
     required int pageIndex,
     required int maxWidth,
@@ -726,20 +738,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_image_data,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicGetPageImageConstMeta,
+        constMeta: kCrateApiReaderGetPageImageConstMeta,
         argValues: [filePath, pageIndex, maxWidth, maxHeight],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetPageImageConstMeta => const TaskConstMeta(
+  TaskConstMeta get kCrateApiReaderGetPageImageConstMeta => const TaskConstMeta(
     debugName: "get_page_image",
     argNames: ["filePath", "pageIndex", "maxWidth", "maxHeight"],
   );
 
   @override
-  Future<Uint8List> crateApiComicGetPageImageEncoded({
+  Future<Uint8List> crateApiReaderGetPageImageEncoded({
     required String filePath,
     required int pageIndex,
   }) {
@@ -760,21 +772,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_list_prim_u_8_strict,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicGetPageImageEncodedConstMeta,
+        constMeta: kCrateApiReaderGetPageImageEncodedConstMeta,
         argValues: [filePath, pageIndex],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetPageImageEncodedConstMeta =>
+  TaskConstMeta get kCrateApiReaderGetPageImageEncodedConstMeta =>
       const TaskConstMeta(
         debugName: "get_page_image_encoded",
         argNames: ["filePath", "pageIndex"],
       );
 
   @override
-  Future<EncodedPage> crateApiComicGetPageImagePng({
+  Future<EncodedPage> crateApiReaderGetPageImagePng({
     required String filePath,
     required int pageIndex,
     required int maxWidth,
@@ -799,21 +811,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_encoded_page,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicGetPageImagePngConstMeta,
+        constMeta: kCrateApiReaderGetPageImagePngConstMeta,
         argValues: [filePath, pageIndex, maxWidth, maxHeight],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetPageImagePngConstMeta =>
+  TaskConstMeta get kCrateApiReaderGetPageImagePngConstMeta =>
       const TaskConstMeta(
         debugName: "get_page_image_png",
         argNames: ["filePath", "pageIndex", "maxWidth", "maxHeight"],
       );
 
   @override
-  Future<ZeroCopyImageData> crateApiComicGetPageImageZeroCopy({
+  Future<ZeroCopyImageData> crateApiReaderGetPageImageZeroCopy({
     required String filePath,
     required int pageIndex,
     required int maxWidth,
@@ -838,21 +850,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_zero_copy_image_data,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicGetPageImageZeroCopyConstMeta,
+        constMeta: kCrateApiReaderGetPageImageZeroCopyConstMeta,
         argValues: [filePath, pageIndex, maxWidth, maxHeight],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetPageImageZeroCopyConstMeta =>
+  TaskConstMeta get kCrateApiReaderGetPageImageZeroCopyConstMeta =>
       const TaskConstMeta(
         debugName: "get_page_image_zero_copy",
         argNames: ["filePath", "pageIndex", "maxWidth", "maxHeight"],
       );
 
   @override
-  BigInt crateApiComicGetPendingPreloadTasks() {
+  BigInt crateApiReaderGetPendingPreloadTasks() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -863,18 +875,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_usize,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetPendingPreloadTasksConstMeta,
+        constMeta: kCrateApiReaderGetPendingPreloadTasksConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetPendingPreloadTasksConstMeta =>
+  TaskConstMeta get kCrateApiReaderGetPendingPreloadTasksConstMeta =>
       const TaskConstMeta(debugName: "get_pending_preload_tasks", argNames: []);
 
   @override
-  BigInt? crateApiComicGetPrevPage({
+  BigInt? crateApiReaderGetPrevPage({
     required BigInt currentPage,
     required BigInt totalPages,
   }) {
@@ -890,20 +902,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_opt_box_autoadd_usize,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetPrevPageConstMeta,
+        constMeta: kCrateApiReaderGetPrevPageConstMeta,
         argValues: [currentPage, totalPages],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetPrevPageConstMeta => const TaskConstMeta(
+  TaskConstMeta get kCrateApiReaderGetPrevPageConstMeta => const TaskConstMeta(
     debugName: "get_prev_page",
     argNames: ["currentPage", "totalPages"],
   );
 
   @override
-  ReadingDirection crateApiComicGetReadingDirection() {
+  ReadingDirection crateApiReaderGetReadingDirection() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -914,44 +926,53 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_reading_direction,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetReadingDirectionConstMeta,
+        constMeta: kCrateApiReaderGetReadingDirectionConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetReadingDirectionConstMeta =>
+  TaskConstMeta get kCrateApiReaderGetReadingDirectionConstMeta =>
       const TaskConstMeta(debugName: "get_reading_direction", argNames: []);
 
   @override
-  List<ReadingProgress> crateApiComicGetReadingHistory({required int limit}) {
-    return handler.executeSync(
-      SyncTask(
-        callFfi: () {
+  Future<List<ReadingProgress>> crateApiProgressGetReadingHistory({
+    required int limit,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_i_32(limit, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 26,
+            port: port_,
+          );
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_reading_progress,
-          decodeErrorData: null,
+          decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicGetReadingHistoryConstMeta,
+        constMeta: kCrateApiProgressGetReadingHistoryConstMeta,
         argValues: [limit],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetReadingHistoryConstMeta =>
+  TaskConstMeta get kCrateApiProgressGetReadingHistoryConstMeta =>
       const TaskConstMeta(
         debugName: "get_reading_history",
         argNames: ["limit"],
       );
 
   @override
-  ReadingProgress? crateApiComicGetReadingProgress({required String filePath}) {
+  ReadingProgress? crateApiProgressGetReadingProgress({
+    required String filePath,
+  }) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -963,21 +984,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_opt_box_autoadd_reading_progress,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetReadingProgressConstMeta,
+        constMeta: kCrateApiProgressGetReadingProgressConstMeta,
         argValues: [filePath],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetReadingProgressConstMeta =>
+  TaskConstMeta get kCrateApiProgressGetReadingProgressConstMeta =>
       const TaskConstMeta(
         debugName: "get_reading_progress",
         argNames: ["filePath"],
       );
 
   @override
-  ReadingStats crateApiComicGetReadingStats() {
+  ReadingStats crateApiProgressGetReadingStats() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -988,18 +1009,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_reading_stats,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetReadingStatsConstMeta,
+        constMeta: kCrateApiProgressGetReadingStatsConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetReadingStatsConstMeta =>
+  TaskConstMeta get kCrateApiProgressGetReadingStatsConstMeta =>
       const TaskConstMeta(debugName: "get_reading_stats", argNames: []);
 
   @override
-  List<LibraryEntry> crateApiComicGetRecentlyAdded({required int limit}) {
+  List<LibraryEntry> crateApiLibraryGetRecentlyAdded({required int limit}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1011,18 +1032,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_list_library_entry,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetRecentlyAddedConstMeta,
+        constMeta: kCrateApiLibraryGetRecentlyAddedConstMeta,
         argValues: [limit],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetRecentlyAddedConstMeta =>
+  TaskConstMeta get kCrateApiLibraryGetRecentlyAddedConstMeta =>
       const TaskConstMeta(debugName: "get_recently_added", argNames: ["limit"]);
 
   @override
-  List<String> crateApiComicGetSupportedFormats() {
+  List<String> crateApiReaderGetSupportedFormats() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1033,14 +1054,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_list_String,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicGetSupportedFormatsConstMeta,
+        constMeta: kCrateApiReaderGetSupportedFormatsConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicGetSupportedFormatsConstMeta =>
+  TaskConstMeta get kCrateApiReaderGetSupportedFormatsConstMeta =>
       const TaskConstMeta(debugName: "get_supported_formats", argNames: []);
 
   @override
@@ -1067,7 +1088,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "greet", argNames: ["name"]);
 
   @override
-  void crateApiComicHideReadingHistory({required String filePath}) {
+  void crateApiProgressHideReadingHistory({required String filePath}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1079,21 +1100,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicHideReadingHistoryConstMeta,
+        constMeta: kCrateApiProgressHideReadingHistoryConstMeta,
         argValues: [filePath],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicHideReadingHistoryConstMeta =>
+  TaskConstMeta get kCrateApiProgressHideReadingHistoryConstMeta =>
       const TaskConstMeta(
         debugName: "hide_reading_history",
         argNames: ["filePath"],
       );
 
   @override
-  Future<void> crateApiComicInitApp() {
+  Future<void> crateApiInitInitApp() {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -1109,14 +1130,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicInitAppConstMeta,
+        constMeta: kCrateApiInitInitAppConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicInitAppConstMeta =>
+  TaskConstMeta get kCrateApiInitInitAppConstMeta =>
       const TaskConstMeta(debugName: "init_app", argNames: []);
 
   @override
@@ -1147,7 +1168,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "init_app", argNames: []);
 
   @override
-  bool crateApiComicIsValidComic({required String filePath}) {
+  bool crateApiReaderIsValidComic({required String filePath}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1159,18 +1180,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_bool,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicIsValidComicConstMeta,
+        constMeta: kCrateApiReaderIsValidComicConstMeta,
         argValues: [filePath],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicIsValidComicConstMeta =>
+  TaskConstMeta get kCrateApiReaderIsValidComicConstMeta =>
       const TaskConstMeta(debugName: "is_valid_comic", argNames: ["filePath"]);
 
   @override
-  Future<List<ImageData>> crateApiComicPreloadPages({
+  Future<List<ImageData>> crateApiReaderPreloadPages({
     required String filePath,
     required List<int> pageIndices,
     required int maxWidth,
@@ -1195,20 +1216,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_list_image_data,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicPreloadPagesConstMeta,
+        constMeta: kCrateApiReaderPreloadPagesConstMeta,
         argValues: [filePath, pageIndices, maxWidth, maxHeight],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicPreloadPagesConstMeta => const TaskConstMeta(
+  TaskConstMeta get kCrateApiReaderPreloadPagesConstMeta => const TaskConstMeta(
     debugName: "preload_pages",
     argNames: ["filePath", "pageIndices", "maxWidth", "maxHeight"],
   );
 
   @override
-  void crateApiComicRemoveBookmark({
+  void crateApiProgressRemoveBookmark({
     required String filePath,
     required int pageIndex,
   }) {
@@ -1224,21 +1245,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicRemoveBookmarkConstMeta,
+        constMeta: kCrateApiProgressRemoveBookmarkConstMeta,
         argValues: [filePath, pageIndex],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicRemoveBookmarkConstMeta =>
+  TaskConstMeta get kCrateApiProgressRemoveBookmarkConstMeta =>
       const TaskConstMeta(
         debugName: "remove_bookmark",
         argNames: ["filePath", "pageIndex"],
       );
 
   @override
-  void crateApiComicRemoveFromLibrary({required String filePath}) {
+  void crateApiLibraryRemoveFromLibrary({required String filePath}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1250,21 +1271,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicRemoveFromLibraryConstMeta,
+        constMeta: kCrateApiLibraryRemoveFromLibraryConstMeta,
         argValues: [filePath],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicRemoveFromLibraryConstMeta =>
+  TaskConstMeta get kCrateApiLibraryRemoveFromLibraryConstMeta =>
       const TaskConstMeta(
         debugName: "remove_from_library",
         argNames: ["filePath"],
       );
 
   @override
-  void crateApiComicRemoveReadingProgress({required String filePath}) {
+  void crateApiProgressRemoveReadingProgress({required String filePath}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1276,75 +1297,86 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicRemoveReadingProgressConstMeta,
+        constMeta: kCrateApiProgressRemoveReadingProgressConstMeta,
         argValues: [filePath],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicRemoveReadingProgressConstMeta =>
+  TaskConstMeta get kCrateApiProgressRemoveReadingProgressConstMeta =>
       const TaskConstMeta(
         debugName: "remove_reading_progress",
         argNames: ["filePath"],
       );
 
   @override
-  void crateApiComicSaveReadingProgress({required ReadingProgress progress}) {
+  void crateApiProgressSaveReadingProgress({
+    required String filePath,
+    required BigInt pageIndex,
+    required BigInt totalPages,
+  }) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_reading_progress(progress, serializer);
+          sse_encode_String(filePath, serializer);
+          sse_encode_usize(pageIndex, serializer);
+          sse_encode_usize(totalPages, serializer);
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicSaveReadingProgressConstMeta,
-        argValues: [progress],
+        constMeta: kCrateApiProgressSaveReadingProgressConstMeta,
+        argValues: [filePath, pageIndex, totalPages],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicSaveReadingProgressConstMeta =>
+  TaskConstMeta get kCrateApiProgressSaveReadingProgressConstMeta =>
       const TaskConstMeta(
         debugName: "save_reading_progress",
-        argNames: ["progress"],
+        argNames: ["filePath", "pageIndex", "totalPages"],
       );
 
   @override
-  List<LibraryEntry> crateApiComicScanDirectoryToLibrary({
+  Future<List<LibraryEntry>> crateApiLibraryScanDirectoryToLibrary({
     required String path,
   }) {
-    return handler.executeSync(
-      SyncTask(
-        callFfi: () {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(path, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 41)!;
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 41,
+            port: port_,
+          );
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_library_entry,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicScanDirectoryToLibraryConstMeta,
+        constMeta: kCrateApiLibraryScanDirectoryToLibraryConstMeta,
         argValues: [path],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicScanDirectoryToLibraryConstMeta =>
+  TaskConstMeta get kCrateApiLibraryScanDirectoryToLibraryConstMeta =>
       const TaskConstMeta(
         debugName: "scan_directory_to_library",
         argNames: ["path"],
       );
 
   @override
-  List<LibraryEntry> crateApiComicSearchLibrary({required String query}) {
+  List<LibraryEntry> crateApiLibrarySearchLibrary({required String query}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1356,18 +1388,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_list_library_entry,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicSearchLibraryConstMeta,
+        constMeta: kCrateApiLibrarySearchLibraryConstMeta,
         argValues: [query],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicSearchLibraryConstMeta =>
+  TaskConstMeta get kCrateApiLibrarySearchLibraryConstMeta =>
       const TaskConstMeta(debugName: "search_library", argNames: ["query"]);
 
   @override
-  void crateApiComicSetArchiveCacheSize({required int maxHandles}) {
+  void crateApiCacheSetArchiveCacheSize({required int maxHandles}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1379,21 +1411,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicSetArchiveCacheSizeConstMeta,
+        constMeta: kCrateApiCacheSetArchiveCacheSizeConstMeta,
         argValues: [maxHandles],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicSetArchiveCacheSizeConstMeta =>
+  TaskConstMeta get kCrateApiCacheSetArchiveCacheSizeConstMeta =>
       const TaskConstMeta(
         debugName: "set_archive_cache_size",
         argNames: ["maxHandles"],
       );
 
   @override
-  void crateApiComicSetCacheLimit({required int maxMemoryMb}) {
+  void crateApiCacheSetCacheLimit({required int maxMemoryMb}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1405,20 +1437,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicSetCacheLimitConstMeta,
+        constMeta: kCrateApiCacheSetCacheLimitConstMeta,
         argValues: [maxMemoryMb],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicSetCacheLimitConstMeta => const TaskConstMeta(
+  TaskConstMeta get kCrateApiCacheSetCacheLimitConstMeta => const TaskConstMeta(
     debugName: "set_cache_limit",
     argNames: ["maxMemoryMb"],
   );
 
   @override
-  void crateApiComicSetDiskCacheLimit({required int maxSizeMb}) {
+  void crateApiCacheSetDiskCacheLimit({required int maxSizeMb}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1430,21 +1462,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicSetDiskCacheLimitConstMeta,
+        constMeta: kCrateApiCacheSetDiskCacheLimitConstMeta,
         argValues: [maxSizeMb],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicSetDiskCacheLimitConstMeta =>
+  TaskConstMeta get kCrateApiCacheSetDiskCacheLimitConstMeta =>
       const TaskConstMeta(
         debugName: "set_disk_cache_limit",
         argNames: ["maxSizeMb"],
       );
 
   @override
-  void crateApiComicSetPreloadStrategy({
+  void crateApiReaderSetPreloadStrategy({
     required int baseCount,
     required int maxCount,
     required bool enableSmart,
@@ -1462,21 +1494,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicSetPreloadStrategyConstMeta,
+        constMeta: kCrateApiReaderSetPreloadStrategyConstMeta,
         argValues: [baseCount, maxCount, enableSmart],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicSetPreloadStrategyConstMeta =>
+  TaskConstMeta get kCrateApiReaderSetPreloadStrategyConstMeta =>
       const TaskConstMeta(
         debugName: "set_preload_strategy",
         argNames: ["baseCount", "maxCount", "enableSmart"],
       );
 
   @override
-  void crateApiComicSetReadingDirection({required ReadingDirection direction}) {
+  void crateApiReaderSetReadingDirection({
+    required ReadingDirection direction,
+  }) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1488,21 +1522,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiComicSetReadingDirectionConstMeta,
+        constMeta: kCrateApiReaderSetReadingDirectionConstMeta,
         argValues: [direction],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicSetReadingDirectionConstMeta =>
+  TaskConstMeta get kCrateApiReaderSetReadingDirectionConstMeta =>
       const TaskConstMeta(
         debugName: "set_reading_direction",
         argNames: ["direction"],
       );
 
   @override
-  void crateApiComicUpdateLastOpened({required String filePath}) {
+  void crateApiLibraryUpdateLastOpened({required String filePath}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -1514,14 +1548,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiComicUpdateLastOpenedConstMeta,
+        constMeta: kCrateApiLibraryUpdateLastOpenedConstMeta,
         argValues: [filePath],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiComicUpdateLastOpenedConstMeta =>
+  TaskConstMeta get kCrateApiLibraryUpdateLastOpenedConstMeta =>
       const TaskConstMeta(
         debugName: "update_last_opened",
         argNames: ["filePath"],

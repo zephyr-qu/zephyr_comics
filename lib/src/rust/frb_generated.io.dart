@@ -3,20 +3,23 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
-import 'api/comic.dart';
+import 'api/cache.dart';
+import 'api/library.dart';
+import 'api/progress.dart';
+import 'api/reader.dart';
 import 'api/simple.dart';
-import 'archive_cache.dart';
-import 'cache.dart';
+import 'cache/archive.dart';
+import 'cache/disk.dart';
+import 'cache/memory.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' as ffi;
-import 'disk_cache.dart';
 import 'frb_generated.dart';
-import 'library_db.dart';
+import 'library/db.dart';
+import 'library/progress.dart';
 import 'metadata.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
-import 'preload_strategy.dart';
-import 'reading_progress.dart';
+import 'preload/strategy.dart';
 import 'types.dart';
 
 abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {

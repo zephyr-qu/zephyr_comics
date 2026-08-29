@@ -207,7 +207,7 @@ impl DiskCache {
         self.update_access_order(&key);
 
         // 定期保存元数据
-        if self.entries.len() % 10 == 0 {
+        if self.entries.len().is_multiple_of(10) {
             self.save_metadata()?;
         }
 
@@ -236,12 +236,10 @@ impl DiskCache {
     /// 清空缓存
     pub fn clear(&mut self) -> Result<()> {
         // 删除所有缓存文件
-        for entry in fs::read_dir(&self.cache_dir).ok().into_iter().flatten() {
-            if let Ok(entry) = entry {
-                let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("cache") {
-                    fs::remove_file(&path).ok();
-                }
+        for entry in fs::read_dir(&self.cache_dir).ok().into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("cache") {
+                fs::remove_file(&path).ok();
             }
         }
 
@@ -350,24 +348,22 @@ impl DiskCache {
 
                 // 删除文件
                 // 需要从 key 重建 PageKey (简化处理：直接删除所有匹配的文件)
-                for entry in fs::read_dir(&self.cache_dir).ok().into_iter().flatten() {
-                    if let Ok(entry) = entry {
-                        let path = entry.path();
-                        if path
-                            .file_name()
-                            .and_then(|s| s.to_str())
-                            .map(|s| {
-                                s.starts_with(&format!(
-                                    "v{}_{}",
-                                    CACHE_VERSION,
-                                    oldest_key.split('_').nth(1).unwrap_or("")
-                                ))
-                            })
-                            .unwrap_or(false)
-                        {
-                            fs::remove_file(&path).ok();
-                            break;
-                        }
+                for entry in fs::read_dir(&self.cache_dir).ok().into_iter().flatten().flatten() {
+                    let path = entry.path();
+                    if path
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .map(|s| {
+                            s.starts_with(&format!(
+                                "v{}_{}",
+                                CACHE_VERSION,
+                                oldest_key.split('_').nth(1).unwrap_or("")
+                            ))
+                        })
+                        .unwrap_or(false)
+                    {
+                        fs::remove_file(&path).ok();
+                        break;
                     }
                 }
 

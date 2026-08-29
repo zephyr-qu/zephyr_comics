@@ -33,6 +33,10 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Flutter Rust Bridge generated bindings
+/lib/src/rust/
+/rust/src/frb_generated.rs
+
 # Symbolication related
 app.*.symbols
 
