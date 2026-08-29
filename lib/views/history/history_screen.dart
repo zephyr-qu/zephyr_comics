@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../library/comic_library.dart';
 import '../../reading/reading_records.dart';
+import '../../reader/reader_launch.dart';
 import '../../signals/app_signals.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -138,7 +139,10 @@ class _HistoryTile extends StatelessWidget {
       ),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text('$progress · ${_date(entry.lastReadAt)}'),
-      onTap: () => context.push('/reader', extra: entry.filePath),
+      onTap: () => context.push(
+        '/reader',
+        extra: ReaderLaunch(filePath: entry.filePath),
+      ),
       trailing: PopupMenuButton<String>(
         onSelected: (value) async {
           if (value == 'delete') {

@@ -47,9 +47,7 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/reader',
       builder: (context, state) {
-        final launch = state.extra is ReaderLaunch
-            ? state.extra as ReaderLaunch
-            : ReaderLaunch(filePath: state.extra as String);
+        final launch = state.extra as ReaderLaunch;
         return ComicReaderScreen(
           filePath: launch.filePath,
           initialPage: launch.initialPage,
