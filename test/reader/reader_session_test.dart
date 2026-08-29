@@ -1,26 +1,20 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zephyr_comics/reading/reading_records.dart';
 import 'package:zephyr_comics/reader/reader_engine.dart';
 import 'package:zephyr_comics/reader/reader_session.dart';
 
 class FakeReaderEngine implements ReaderEngine {
   FakeReaderEngine({
     this.totalPages = 5,
-    this.savedPage,
     this.openCompleter,
-    this.writeCompleter,
-    this.failWrites = false,
     Set<int>? failOncePages,
   }) : failOncePages = failOncePages ?? <int>{};
   final int totalPages;
-  final int? savedPage;
   final Completer<void>? openCompleter;
-  final Completer<void>? writeCompleter;
-  final bool failWrites;
   final Set<int> failOncePages;
   final List<int> loads = [];
-  final List<int> writes = [];
 
   @override
   Future<ReaderBook> open(String filePath) async {
@@ -41,25 +35,10 @@ class FakeReaderEngine implements ReaderEngine {
     }
     return Uint8List.fromList([pageIndex]);
   }
-
-  @override
-  Future<ReaderProgress?> readProgress(String filePath) async =>
-      savedPage == null
-      ? null
-      : ReaderProgress(filePath: filePath, pageIndex: savedPage!);
-
-  @override
-  Future<void> writeProgress(ReaderProgress progress) async {
-    writes.add(progress.pageIndex);
-    if (failWrites) {
-      throw const ReaderFailure(ReaderFailureKind.persistence, '阅读进度保存失败');
-    }
-    await writeCompleter?.future;
-  }
 }
 
 final class GatedPageReaderEngine extends FakeReaderEngine {
-  GatedPageReaderEngine({super.totalPages, super.savedPage});
+  GatedPageReaderEngine({super.totalPages});
 
   final Map<int, Completer<void>> gates = {};
   int activeLoads = 0;
@@ -101,11 +80,92 @@ Future<void> releaseRequestedPages(GatedPageReaderEngine engine) async {
   }
 }
 
+/// Gated/failing progress adapter so persist behavior stays observable
+/// without touching the FRB channel.
+final class _GatedRecordsAdapter implements ReadingRecordsAdapter {
+  _GatedRecordsAdapter({this.writeGate, this.failSaves = false});
+  final Completer<void>? writeGate;
+  final bool failSaves;
+  final InMemoryReadingRecordsAdapter _inner = InMemoryReadingRecordsAdapter();
+  int writes = 0;
+
+  @override
+  Future<ReadingProgressRecord?> readProgress(String filePath) =>
+      _inner.readProgress(filePath);
+
+  @override
+  Future<void> saveProgress({
+    required String filePath,
+    required int pageIndex,
+    required int totalPages,
+  }) {
+    if (failSaves) {
+      throw const ReaderFailure(ReaderFailureKind.persistence, '阅读进度保存失败');
+    }
+    writes++;
+    return () async {
+      await writeGate?.future;
+      await _inner.saveProgress(
+        filePath: filePath,
+        pageIndex: pageIndex,
+        totalPages: totalPages,
+      );
+    }();
+  }
+
+  @override
+  Future<List<ReadingHistoryEntry>> readHistory({required int limit}) =>
+      _inner.readHistory(limit: limit);
+
+  @override
+  Future<void> removeHistory(String filePath) => _inner.removeHistory(filePath);
+
+  @override
+  Future<void> resetProgress(String filePath) => _inner.resetProgress(filePath);
+
+  @override
+  Future<List<BookmarkRecord>> readBookmarks(String filePath) =>
+      _inner.readBookmarks(filePath);
+
+  @override
+  Future<BookmarkRecord> addBookmark(
+    String filePath,
+    int pageIndex, {
+    String? note,
+  }) => _inner.addBookmark(filePath, pageIndex, note: note);
+
+  @override
+  Future<void> removeBookmark(String filePath, int pageIndex) =>
+      _inner.removeBookmark(filePath, pageIndex);
+}
+
+Future<ReadingRecords> recordsWith({
+  int? savedPage,
+  int totalPages = 5,
+  Completer<void>? writeGate,
+  bool failSaves = false,
+}) async {
+  final adapter = _GatedRecordsAdapter(
+    writeGate: writeGate,
+    failSaves: failSaves,
+  );
+  if (savedPage != null) {
+    await adapter.saveProgress(
+      filePath: 'book.cbz',
+      pageIndex: savedPage,
+      totalPages: totalPages,
+    );
+  }
+  return ReadingRecords(adapter: adapter);
+}
+
 void main() {
   test('open restores and clamps saved progress', () async {
+    final records = await recordsWith(savedPage: 99, totalPages: 5);
     final session = ReaderSession(
       filePath: 'book.cbz',
-      engine: FakeReaderEngine(totalPages: 3, savedPage: 99),
+      engine: FakeReaderEngine(totalPages: 3),
+      records: records,
     );
     await session.open();
     final ready = session.snapshot.value as ReaderReady;
@@ -115,8 +175,13 @@ void main() {
   });
 
   test('open prepares the restored page and the next page', () async {
-    final engine = FakeReaderEngine(totalPages: 10, savedPage: 3);
-    final session = ReaderSession(filePath: 'book.cbz', engine: engine);
+    final engine = FakeReaderEngine(totalPages: 10);
+    final records = await recordsWith(savedPage: 3, totalPages: 10);
+    final session = ReaderSession(
+      filePath: 'book.cbz',
+      engine: engine,
+      records: records,
+    );
 
     await session.open();
     await Future<void>.delayed(Duration.zero);
@@ -134,7 +199,12 @@ void main() {
         ..gates.addAll({
           for (var index = 0; index < 12; index++) index: Completer<void>(),
         });
-      final session = ReaderSession(filePath: 'book.cbz', engine: engine);
+      final records = await recordsWith();
+      final session = ReaderSession(
+        filePath: 'book.cbz',
+        engine: engine,
+        records: records,
+      );
 
       await session.open();
       expect(engine.loads, [0, 1]);
@@ -149,7 +219,12 @@ void main() {
 
   test('page requests are cached and retry reloads', () async {
     final engine = FakeReaderEngine();
-    final session = ReaderSession(filePath: 'book.cbz', engine: engine);
+    final records = await recordsWith();
+    final session = ReaderSession(
+      filePath: 'book.cbz',
+      engine: engine,
+      records: records,
+    );
     await session.open();
     await session.loadPage(1);
     await session.loadPage(1);
@@ -160,8 +235,13 @@ void main() {
   });
 
   test('moving backward reverses the bounded prefetch window', () async {
-    final engine = FakeReaderEngine(totalPages: 12, savedPage: 5);
-    final session = ReaderSession(filePath: 'book.cbz', engine: engine);
+    final engine = FakeReaderEngine(totalPages: 12);
+    final records = await recordsWith(savedPage: 5, totalPages: 12);
+    final session = ReaderSession(
+      filePath: 'book.cbz',
+      engine: engine,
+      records: records,
+    );
     await session.open();
     await Future<void>.delayed(Duration.zero);
 
@@ -175,8 +255,13 @@ void main() {
   });
 
   test('returning to an active page retains the shared result', () async {
-    final engine = GatedPageReaderEngine(totalPages: 12, savedPage: 5);
-    final session = ReaderSession(filePath: 'book.cbz', engine: engine);
+    final engine = GatedPageReaderEngine(totalPages: 12);
+    final records = await recordsWith(savedPage: 5, totalPages: 12);
+    final session = ReaderSession(
+      filePath: 'book.cbz',
+      engine: engine,
+      records: records,
+    );
     await session.open();
     expect(engine.loads, [5, 6]);
 
@@ -196,7 +281,12 @@ void main() {
 
   test('foreground page requests jump ahead of queued prefetches', () async {
     final engine = GatedPageReaderEngine(totalPages: 10);
-    final session = ReaderSession(filePath: 'book.cbz', engine: engine);
+    final records = await recordsWith();
+    final session = ReaderSession(
+      filePath: 'book.cbz',
+      engine: engine,
+      records: records,
+    );
     await session.open();
     expect(engine.loads, [0, 1]);
 
@@ -216,7 +306,12 @@ void main() {
 
   test('the latest current page replaces obsolete queued work', () async {
     final engine = GatedPageReaderEngine(totalPages: 15);
-    final session = ReaderSession(filePath: 'book.cbz', engine: engine);
+    final records = await recordsWith();
+    final session = ReaderSession(
+      filePath: 'book.cbz',
+      engine: engine,
+      records: records,
+    );
     await session.open();
     expect(engine.loads, [0, 1]);
 
@@ -234,7 +329,12 @@ void main() {
     'rapid page requests keep pending work and concurrency bounded',
     () async {
       final engine = GatedPageReaderEngine(totalPages: 20);
-      final session = ReaderSession(filePath: 'book.cbz', engine: engine);
+      final records = await recordsWith();
+      final session = ReaderSession(
+        filePath: 'book.cbz',
+        engine: engine,
+        records: records,
+      );
       await session.open();
 
       final requests = <Future<void>>[
@@ -253,7 +353,12 @@ void main() {
 
   test('prefetch failure is page-local and retry remains available', () async {
     final engine = FakeReaderEngine(failOncePages: {1});
-    final session = ReaderSession(filePath: 'book.cbz', engine: engine);
+    final records = await recordsWith();
+    final session = ReaderSession(
+      filePath: 'book.cbz',
+      engine: engine,
+      records: records,
+    );
     await session.open();
     await Future<void>.delayed(Duration.zero);
 
@@ -273,7 +378,12 @@ void main() {
         ..gates.addAll({
           for (var index = 0; index < 5; index++) index: Completer<void>(),
         });
-      final session = ReaderSession(filePath: 'book.cbz', engine: engine);
+      final records = await recordsWith();
+      final session = ReaderSession(
+        filePath: 'book.cbz',
+        engine: engine,
+        records: records,
+      );
       await session.open();
       session.moveTo(4);
       final requests = [
@@ -295,24 +405,30 @@ void main() {
 
   test('rapid moves debounce and close flushes final progress', () async {
     final engine = FakeReaderEngine();
+    final records = await recordsWith();
     final session = ReaderSession(
       filePath: 'book.cbz',
       engine: engine,
+      records: records,
       saveDelay: const Duration(hours: 1),
     );
     await session.open();
     session.moveTo(1);
     session.moveTo(4);
-    expect(engine.writes, isEmpty);
+    final progressBeforeClose = await records.progressFor('book.cbz');
+    expect(progressBeforeClose?.pageIndex, isNot(4));
     await session.close();
-    expect(engine.writes, [4]);
+    final progress = await records.progressFor('book.cbz');
+    expect(progress?.pageIndex, 4);
   });
 
   test('close is safe while open is still in flight', () async {
     final gate = Completer<void>();
+    final records = await recordsWith();
     final session = ReaderSession(
       filePath: 'book.cbz',
       engine: FakeReaderEngine(openCompleter: gate),
+      records: records,
     );
     final opening = session.open();
     await session.close();
@@ -322,7 +438,12 @@ void main() {
 
   test('active loads finishing after close do not start queued work', () async {
     final engine = GatedPageReaderEngine(totalPages: 10);
-    final session = ReaderSession(filePath: 'book.cbz', engine: engine);
+    final records = await recordsWith();
+    final session = ReaderSession(
+      filePath: 'book.cbz',
+      engine: engine,
+      records: records,
+    );
     await session.open();
     expect(engine.loads, [0, 1]);
 
@@ -338,10 +459,11 @@ void main() {
 
   test('close waits for an in-flight progress write', () async {
     final gate = Completer<void>();
-    final engine = FakeReaderEngine(writeCompleter: gate);
+    final records = await recordsWith(writeGate: gate);
     final session = ReaderSession(
       filePath: 'book.cbz',
-      engine: engine,
+      engine: FakeReaderEngine(),
+      records: records,
       saveDelay: Duration.zero,
     );
     await session.open();
@@ -353,13 +475,16 @@ void main() {
     expect(closed, isFalse);
     gate.complete();
     await closing;
-    expect(engine.writes, [2]);
+    final progress = await records.progressFor('book.cbz');
+    expect(progress?.pageIndex, 2);
   });
 
   test('persistence failure becomes a non-blocking warning', () async {
+    final records = await recordsWith(failSaves: true);
     final session = ReaderSession(
       filePath: 'book.cbz',
-      engine: FakeReaderEngine(failWrites: true),
+      engine: FakeReaderEngine(),
+      records: records,
       saveDelay: Duration.zero,
     );
     await session.open();

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../reading/reading_records.dart';
 import 'reader_engine.dart';
 
 sealed class ReaderSnapshot {
@@ -30,6 +31,7 @@ final class ReaderSession {
   ReaderSession({
     required this.filePath,
     required this.engine,
+    required this.records,
     this.initialPage,
     this.preserveProgressOnStart = false,
     this.saveDelay = const Duration(milliseconds: 400),
@@ -37,6 +39,7 @@ final class ReaderSession {
 
   final String filePath;
   final ReaderEngine engine;
+  final ReadingRecords records;
   final int? initialPage;
   final bool preserveProgressOnStart;
   final Duration saveDelay;
@@ -62,10 +65,10 @@ final class ReaderSession {
     try {
       final results = await Future.wait<Object?>([
         engine.open(filePath),
-        engine.readProgress(filePath),
+        records.progressFor(filePath),
       ]);
       final book = results[0] as ReaderBook;
-      final progress = results[1] as ReaderProgress?;
+      final progress = results[1] as ReadingProgressRecord?;
       if (_closed) return;
       if (book.totalPages <= 0) {
         throw StateError('漫画文件中没有页面');
@@ -148,8 +151,12 @@ final class ReaderSession {
   void _enqueuePersist(int pageIndex) {
     _saveQueue = _saveQueue.then((_) async {
       try {
-        await engine.writeProgress(
-          ReaderProgress(filePath: filePath, pageIndex: pageIndex),
+        final ready = snapshot.value;
+        if (ready is! ReaderReady) return;
+        await records.recordProgress(
+          filePath: filePath,
+          pageIndex: pageIndex,
+          totalPages: ready.totalPages,
         );
       } catch (error) {
         if (_closed) return;

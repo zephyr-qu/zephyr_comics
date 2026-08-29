@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:zephyr_comics/models/reader_mode.dart';
+import 'package:zephyr_comics/reading/reading_records.dart';
 import 'package:zephyr_comics/reader/reader_engine.dart';
 import 'package:zephyr_comics/signals/app_signals.dart';
 import 'package:zephyr_comics/views/reader/comic_reader_screen.dart';
@@ -16,13 +17,11 @@ final class WidgetReaderEngine implements ReaderEngine {
   WidgetReaderEngine({
     this.openGate,
     this.failFirstOpen = false,
-    this.savedPage = 0,
     this.failFirstDecode = false,
   });
 
   final Completer<void>? openGate;
   final bool failFirstOpen;
-  final int savedPage;
   final bool failFirstDecode;
   int openCalls = 0;
   int pageLoads = 0;
@@ -58,17 +57,15 @@ final class WidgetReaderEngine implements ReaderEngine {
     if (failFirstDecode && pageLoads == 1) return Uint8List.fromList([0]);
     return png;
   }
-
-  @override
-  Future<ReaderProgress?> readProgress(String filePath) async =>
-      ReaderProgress(filePath: filePath, pageIndex: savedPage);
-
-  @override
-  Future<void> writeProgress(ReaderProgress progress) async {}
 }
 
-Widget _app(ReaderEngine engine) => MaterialApp(
-  home: ComicReaderScreen(filePath: 'test.cbz', readerEngine: engine),
+Widget _app(ReaderEngine engine, {ReadingRecords? records}) => MaterialApp(
+  home: ComicReaderScreen(
+    filePath: 'test.cbz',
+    readerEngine: engine,
+    records:
+        records ?? ReadingRecords(adapter: InMemoryReadingRecordsAdapter()),
+  ),
 );
 
 void main() {
@@ -141,8 +138,14 @@ void main() {
   testWidgets('mode switch preserves session and restored current page', (
     tester,
   ) async {
-    final engine = WidgetReaderEngine(savedPage: 1);
-    await tester.pumpWidget(_app(engine));
+    final records = ReadingRecords(adapter: InMemoryReadingRecordsAdapter());
+    await records.recordProgress(
+      filePath: 'test.cbz',
+      pageIndex: 1,
+      totalPages: 3,
+    );
+    final engine = WidgetReaderEngine();
+    await tester.pumpWidget(_app(engine, records: records));
     await tester.pump();
     expect(find.text('2 / 3'), findsOneWidget);
 

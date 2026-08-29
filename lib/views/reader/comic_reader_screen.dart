@@ -8,6 +8,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../models/reader_mode.dart';
 import '../../models/settings_options.dart';
+import '../../reading/reading_records.dart';
 import '../../reader/frb_reader_engine.dart';
 import '../../reader/reader_engine.dart';
 import '../../reader/reader_session.dart';
@@ -20,11 +21,13 @@ class ComicReaderScreen extends StatefulWidget {
     this.initialPage,
     this.preserveProgressOnStart = false,
     this.readerEngine,
+    this.records,
   });
   final String filePath;
   final int? initialPage;
   final bool preserveProgressOnStart;
   final ReaderEngine? readerEngine;
+  final ReadingRecords? records;
 
   @override
   State<ComicReaderScreen> createState() => _ComicReaderScreenState();
@@ -46,6 +49,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
     _session = ReaderSession(
       filePath: widget.filePath,
       engine: widget.readerEngine ?? FrbReaderEngine(),
+      records: widget.records ?? readingRecords,
       initialPage: widget.initialPage,
       preserveProgressOnStart: widget.preserveProgressOnStart,
     );

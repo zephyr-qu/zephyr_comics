@@ -33,12 +33,6 @@ final class ReaderPage {
   final Uint8List encodedBytes;
 }
 
-final class ReaderProgress {
-  const ReaderProgress({required this.filePath, required this.pageIndex});
-  final String filePath;
-  final int pageIndex;
-}
-
 abstract interface class ReaderEngine {
   Future<ReaderBook> open(String filePath);
 
@@ -53,6 +47,4 @@ abstract interface class ReaderEngine {
     required int maxWidth,
     required int maxHeight,
   });
-  Future<ReaderProgress?> readProgress(String filePath);
-  Future<void> writeProgress(ReaderProgress progress);
 }

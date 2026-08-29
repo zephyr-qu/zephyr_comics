@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import '../src/rust/api/comic.dart' as rust;
-import '../src/rust/reading_progress.dart' as rust_progress;
 import 'reader_engine.dart';
 
 final class FrbReaderEngine implements ReaderEngine {
@@ -34,38 +33,6 @@ final class FrbReaderEngine implements ReaderEngine {
       );
     } catch (error) {
       throw _mapFailure(error, ReaderFailureKind.pageDecode);
-    }
-  }
-
-  @override
-  Future<ReaderProgress?> readProgress(String filePath) async {
-    try {
-      final progress = rust.getReadingProgress(filePath: filePath);
-      return progress == null
-          ? null
-          : ReaderProgress(
-              filePath: progress.filePath,
-              pageIndex: progress.pageIndex.toInt(),
-            );
-    } catch (error) {
-      throw ReaderFailure(ReaderFailureKind.persistence, '阅读进度读取失败', error);
-    }
-  }
-
-  @override
-  Future<void> writeProgress(ReaderProgress progress) async {
-    try {
-      rust.saveReadingProgress(
-        progress: rust_progress.ReadingProgress(
-          filePath: progress.filePath,
-          chapterIndex: BigInt.zero,
-          pageIndex: BigInt.from(progress.pageIndex),
-          lastReadTimestamp: BigInt.from(DateTime.now().millisecondsSinceEpoch),
-          completionPercent: 0,
-        ),
-      );
-    } catch (error) {
-      throw ReaderFailure(ReaderFailureKind.persistence, '阅读进度保存失败', error);
     }
   }
 

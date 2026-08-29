@@ -11,11 +11,7 @@ void main() {
     const path = '/comics/blue.cbz';
     final adapter = InMemoryReadingRecordsAdapter();
     final records = ReadingRecords(adapter: adapter);
-    await adapter.saveProgress(
-      filePath: path,
-      pageIndex: 4,
-      completionPercent: 25,
-    );
+    await adapter.saveProgress(filePath: path, pageIndex: 4, totalPages: 16);
     await records.addBookmark(path, 4);
 
     await tester.pumpWidget(

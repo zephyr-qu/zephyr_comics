@@ -1,5 +1,5 @@
 import '../src/rust/api/comic.dart' as rust;
-import '../src/rust/reading_progress.dart' as rust_progress;
+import '../src/rust/library/progress.dart' as rust_progress;
 
 /// Product-facing progress; FRB/SQLite types never cross this boundary.
 final class ReadingProgressRecord {
@@ -54,7 +54,7 @@ abstract interface class ReadingRecordsAdapter {
   Future<void> saveProgress({
     required String filePath,
     required int pageIndex,
-    required double completionPercent,
+    required int totalPages,
   });
 
   Future<List<ReadingHistoryEntry>> readHistory({required int limit});
@@ -90,13 +90,11 @@ final class ReadingRecords {
   }) {
     final safeTotal = totalPages < 1 ? 1 : totalPages;
     final safePage = pageIndex.clamp(0, safeTotal - 1).toInt();
-    final completion = safePage == safeTotal - 1
-        ? 100.0
-        : (safePage / safeTotal) * 100.0;
+    // 完成度由 Rust 侧统一计算；这里只负责夹取页面索引。
     return adapter.saveProgress(
       filePath: filePath,
       pageIndex: safePage,
-      completionPercent: completion,
+      totalPages: safeTotal,
     );
   }
 
@@ -134,23 +132,18 @@ final class FrbReadingRecordsAdapter implements ReadingRecordsAdapter {
   Future<void> saveProgress({
     required String filePath,
     required int pageIndex,
-    required double completionPercent,
+    required int totalPages,
   }) async {
     rust.saveReadingProgress(
-      progress: rust_progress.ReadingProgress(
-        filePath: filePath,
-        chapterIndex: BigInt.zero,
-        pageIndex: BigInt.from(pageIndex),
-        lastReadTimestamp: BigInt.from(DateTime.now().millisecondsSinceEpoch),
-        completionPercent: completionPercent,
-      ),
+      filePath: filePath,
+      pageIndex: BigInt.from(pageIndex),
+      totalPages: BigInt.from(totalPages),
     );
   }
 
   @override
   Future<List<ReadingHistoryEntry>> readHistory({required int limit}) async =>
-      rust
-          .getReadingHistory(limit: limit)
+      (await rust.getReadingHistory(limit: limit))
           .map(
             (value) => ReadingHistoryEntry(
               filePath: value.filePath,
@@ -225,15 +218,21 @@ final class InMemoryReadingRecordsAdapter implements ReadingRecordsAdapter {
   Future<void> saveProgress({
     required String filePath,
     required int pageIndex,
-    required double completionPercent,
+    required int totalPages,
   }) async {
+    // 镜像 Rust 完成度语义：夹取索引，末页记 100%，否则按占比。
+    final safeTotal = totalPages < 1 ? 1 : totalPages;
+    final safePage = pageIndex.clamp(0, safeTotal - 1).toInt();
+    final completion = safePage == safeTotal - 1
+        ? 100.0
+        : (safePage / safeTotal) * 100.0;
     final previous = _progress[filePath];
-    final finished = previous?.isFinished == true || completionPercent >= 99.0;
+    final finished = previous?.isFinished == true || completion >= 99.0;
     _progress[filePath] = ReadingProgressRecord(
       filePath: filePath,
-      pageIndex: pageIndex,
+      pageIndex: safePage,
       lastReadAt: DateTime.now(),
-      completionPercent: finished ? 100.0 : completionPercent,
+      completionPercent: finished ? 100.0 : completion,
     );
     _historyVisible[filePath] = true;
   }

@@ -25,7 +25,7 @@ use crate::error::{ComicError, Result};
 use crate::library_db::{get_global_db, init_global_db, LibraryEntry};
 use crate::metadata::{extract_metadata, ComicMetadata};
 use crate::preload_strategy::{PreloadManager, PreloadStrategy, ReadingDirection};
-use crate::reading_progress::{Bookmark, ReadingProgress, ReadingStats};
+use crate::reading_progress::{Bookmark, current_timestamp, ReadingProgress, ReadingStats};
 use crate::types::{ComicInfo, EncodedPage, ImageData, ThumbnailData};
 
 /// 全局缓存实例 (懒初始化)
@@ -588,6 +588,27 @@ mod tests {
         let pages = calculate_preload_pages(10, 50, ReadingDirection::LeftToRight);
         assert!(!pages.is_empty());
     }
+
+    #[tokio::test]
+    async fn reading_history_propagates_database_lock_failure() {
+        let path = std::env::temp_dir().join(format!(
+            "zephyr-reading-history-poison-{}.db",
+            std::process::id()
+        ));
+        let db = crate::library_db::LibraryDatabase::new(Some(path.clone())).unwrap();
+        let db = Arc::new(Mutex::new(db));
+        let poisoned = Arc::clone(&db);
+
+        let _ = std::thread::spawn(move || {
+            let _guard = poisoned.lock().unwrap();
+            panic!("poison the database lock for the regression test");
+        })
+        .join();
+
+        let result = read_reading_history(db, 100).await;
+        assert!(matches!(result, Err(ComicError::Internal(message)) if message.contains("数据库锁中毒")));
+        let _ = std::fs::remove_file(path);
+    }
 }
 
 // ============ 磁盘缓存 API ============
@@ -816,12 +837,26 @@ pub fn get_pending_preload_tasks() -> usize {
 
 // ============ 阅读进度 API ============
 
-/// 保存阅读进度
+/// 保存阅读进度，Rust 侧统一计算完成度与时间戳
 ///
 /// # 参数
-/// * `progress` - 阅读进度信息
+/// * `file_path` - 漫画文件完整路径
+/// * `page_index` - 当前页面索引 (从 0 开始)
+/// * `total_pages` - 漫画总页数
 #[frb(sync)]
-pub fn save_reading_progress(progress: ReadingProgress) -> Result<()> {
+pub fn save_reading_progress(
+    file_path: String,
+    page_index: usize,
+    total_pages: usize,
+) -> Result<()> {
+    let page = page_index.min(total_pages.saturating_sub(1));
+    let progress = ReadingProgress {
+        file_path,
+        chapter_index: 0,
+        page_index: page,
+        last_read_timestamp: current_timestamp(),
+        completion_percent: ReadingProgress::completion_percent(page, total_pages),
+    };
     if let Some(db) = get_global_db() {
         let db_guard = db
             .lock()
@@ -857,20 +892,24 @@ pub fn get_reading_progress(file_path: String) -> Option<ReadingProgress> {
 ///
 /// # 参数
 /// * `limit` - 返回数量限制
-#[frb(sync)]
-pub fn get_reading_history(limit: i32) -> Vec<ReadingProgress> {
-    if let Some(db) = get_global_db() {
-        db.lock()
-            .map_err(|e| {
-                log::error!("数据库锁中毒：{}", e);
-                ComicError::Internal(format!("数据库锁中毒：{}", e))
-            })
-            .ok()
-            .and_then(|db_guard| db_guard.get_reading_history(limit as usize).ok())
-            .unwrap_or_default()
-    } else {
-        Vec::new()
-    }
+async fn read_reading_history(
+    db: Arc<Mutex<crate::library_db::LibraryDatabase>>,
+    limit: usize,
+) -> Result<Vec<ReadingProgress>> {
+    tokio::task::spawn_blocking(move || {
+        let db_guard = db
+            .lock()
+            .map_err(|e| ComicError::Internal(format!("数据库锁中毒：{}", e)))?;
+        db_guard.get_reading_history(limit)
+    })
+    .await
+    .map_err(|error| ComicError::Internal(format!("读取阅读历史任务失败：{}", error)))?
+}
+
+#[frb(dart_async)]
+pub async fn get_reading_history(limit: i32) -> Result<Vec<ReadingProgress>> {
+    let db = get_global_db().ok_or_else(|| ComicError::Internal("数据库未初始化".to_string()))?;
+    read_reading_history(db, limit.max(0) as usize).await
 }
 
 /// Hide one history entry without deleting its progress or bookmarks.
@@ -1011,16 +1050,18 @@ pub fn extract_comic_metadata(file_path: String) -> Result<ComicMetadata> {
 ///
 /// # 参数
 /// * `path` - 目录路径
-#[frb(sync)]
-pub fn scan_directory_to_library(path: String) -> Result<Vec<LibraryEntry>> {
-    if let Some(db) = get_global_db() {
+#[frb(dart_async)]
+pub async fn scan_directory_to_library(path: String) -> Result<Vec<LibraryEntry>> {
+    let db = get_global_db().ok_or_else(|| ComicError::Internal("数据库未初始化".to_string()))?;
+
+    tokio::task::spawn_blocking(move || {
         let db_guard = db
             .lock()
             .map_err(|e| ComicError::Internal(format!("数据库锁中毒：{}", e)))?;
         crate::library_scanner::scan_directory_to_library(&db_guard, &path)
-    } else {
-        Err(ComicError::Internal("数据库未初始化".to_string()))
-    }
+    })
+    .await
+    .map_err(|error| ComicError::Internal(format!("扫描任务失败：{}", error)))?
 }
 
 /// 获取图书馆所有漫画
@@ -1168,12 +1209,24 @@ mod testsaa {
     fn test_reading_progress() {
         init_app();
 
-        let progress = ReadingProgress::new("test.cbz".to_string(), 0, 5);
-        let result = save_reading_progress(progress);
-        assert!(result.is_ok());
+        assert!(save_reading_progress("test.cbz".to_string(), 0, 50).is_ok());
+        let first = get_reading_progress("test.cbz".to_string()).unwrap();
+        assert_eq!(first.page_index, 0);
+        assert_eq!(first.completion_percent, 0.0);
 
-        let retrieved = get_reading_progress("test.cbz".to_string());
-        assert!(retrieved.is_some());
+        assert!(save_reading_progress("test.cbz".to_string(), 25, 50).is_ok());
+        let mid = get_reading_progress("test.cbz".to_string()).unwrap();
+        assert_eq!(mid.page_index, 25);
+        assert!((mid.completion_percent - 50.0).abs() < 0.1);
+
+        assert!(save_reading_progress("test.cbz".to_string(), 49, 50).is_ok());
+        let last = get_reading_progress("test.cbz".to_string()).unwrap();
+        assert_eq!(last.completion_percent, 100.0);
+
+        assert!(save_reading_progress("test.cbz".to_string(), 500, 50).is_ok());
+        let clamped = get_reading_progress("test.cbz".to_string()).unwrap();
+        assert_eq!(clamped.page_index, 49);
+        assert_eq!(clamped.completion_percent, 100.0);
     }
 
     #[test]
