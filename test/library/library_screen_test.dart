@@ -7,7 +7,6 @@ import 'package:zephyr_comics/views/library/library_screen.dart';
 void main() {
   setUp(() {
     scanDirectoryPath.value = '';
-    isScanning.value = false;
     librarySnapshot.value = const LibrarySnapshot(
       status: LibraryStatus.initial,
       entries: [],
@@ -37,5 +36,32 @@ void main() {
 
     expect(find.text('没有匹配的漫画'), findsOneWidget);
     expect(find.text('清除搜索'), findsOneWidget);
+  });
+
+  testWidgets('keeps the shelf mounted while refreshing existing entries', (
+    tester,
+  ) async {
+    scanDirectoryPath.value = '/comics';
+    librarySnapshot.value = const LibrarySnapshot(
+      status: LibraryStatus.content,
+      entries: [
+        ComicLibraryEntry(
+          path: '/comics/one.cbz',
+          title: 'One',
+          format: 'cbz',
+          fileSize: 1,
+          totalPages: 1,
+          addedAt: 1,
+        ),
+      ],
+    );
+    librarySnapshot.value = librarySnapshot.value.copyWith(
+      status: LibraryStatus.loading,
+    );
+
+    await tester.pumpWidget(const MaterialApp(home: LibraryScreen()));
+
+    expect(find.byType(RefreshIndicator), findsOneWidget);
+    expect(find.text('One'), findsOneWidget);
   });
 }

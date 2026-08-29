@@ -58,7 +58,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
           final path = scanDirectoryPath.value;
           final snapshot = librarySnapshot.value;
           if (path.isEmpty) return _buildNoPathState(context);
-          if (snapshot.status == LibraryStatus.loading || isScanning.value) {
+          // Keep an existing shelf mounted during pull-to-refresh so the
+          // RefreshIndicator can finish its Future instead of being replaced
+          // by the full-screen loading state.
+          if (snapshot.status == LibraryStatus.loading &&
+              snapshot.entries.isEmpty) {
             return _buildLoadingState(context);
           }
           if (snapshot.status == LibraryStatus.warning) {

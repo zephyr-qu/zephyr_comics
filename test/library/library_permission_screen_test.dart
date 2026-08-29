@@ -10,7 +10,6 @@ void main() {
 
   setUp(() {
     scanDirectoryPath.value = '';
-    isScanning.value = false;
     librarySnapshot.value = const LibrarySnapshot(
       status: LibraryStatus.initial,
       entries: [],

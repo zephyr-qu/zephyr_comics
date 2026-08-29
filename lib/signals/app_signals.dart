@@ -1,14 +1,13 @@
 import 'package:signals_flutter/signals_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import '../models/reader_mode.dart';
 import '../models/settings_options.dart';
-import '../src/rust/library/db.dart' show LibraryEntry;
 import '../src/rust/api/comic.dart' show scanDirectoryToLibrary;
 import '../library/comic_library.dart';
 import '../library/library_root_access.dart';
 import '../reading/reading_records.dart';
 import '../services/android_library_root_access.dart';
+import '../services/preferences.dart';
 
 final scanDirectoryPath = signal<String>('');
 final readerMode = signal<ReaderMode>(ReaderMode.vertical);
@@ -22,9 +21,7 @@ final orientationPreference = signal<OrientationPreference>(
   OrientationPreference.auto,
 );
 final readerBackground = signal<ReaderBackground>(ReaderBackground.black);
-final libraryEntries = signal<List<LibraryEntry>>([]);
-final isScanning = signal<bool>(false);
-final errorMessage = signal<String?>(null);
+
 final comicLibrary = ComicLibrary(adapter: _RustComicLibraryAdapter());
 final libraryRootAccess = LibraryRootAccess(
   permission: const AndroidAllFilesAccessAdapter(),
@@ -34,7 +31,9 @@ final librarySnapshot = signal<LibrarySnapshot>(
   const LibrarySnapshot(status: LibraryStatus.initial, entries: []),
 );
 final readingRecords = ReadingRecords(adapter: FrbReadingRecordsAdapter());
-int _refreshGeneration = 0;
+Preferences? _preferences;
+
+Future<Preferences> _prefs() async => _preferences ??= await Preferences.load();
 
 class _RustComicLibraryAdapter implements ComicLibraryAdapter {
   @override
@@ -60,27 +59,33 @@ class _RustComicLibraryAdapter implements ComicLibraryAdapter {
 }
 
 Future<void> loadPreferences() async {
-  final prefs = await SharedPreferences.getInstance();
-  scanDirectoryPath.value = prefs.getString('scanPath') ?? '';
+  final prefs = await _prefs();
+  scanDirectoryPath.value = prefs.getString(Preferences.scanPath) ?? '';
   readerMode.value = ReaderMode.fromStorage(
-    prefs.getString('readerMode') ?? 'vertical',
+    prefs.getString(Preferences.readerMode) ?? 'vertical',
   );
-  isDarkMode.value = prefs.getBool('isDarkMode') ?? true;
+  isDarkMode.value = prefs.getBool(Preferences.isDarkMode) ?? true;
   themePreference.value = ThemePreference.values.firstWhere(
-    (value) => value.name == (prefs.getString('themePreference') ?? 'system'),
+    (value) =>
+        value.name ==
+        (prefs.getString(Preferences.themePreference) ?? 'system'),
     orElse: () => ThemePreference.system,
   );
-  autoRefreshLibrary.value = prefs.getBool('autoRefreshLibrary') ?? true;
-  keepScreenAwake.value = prefs.getBool('keepScreenAwake') ?? true;
-  volumeKeyPaging.value = prefs.getBool('volumeKeyPaging') ?? false;
-  showPageNumber.value = prefs.getBool('showPageNumber') ?? true;
+  autoRefreshLibrary.value =
+      prefs.getBool(Preferences.autoRefreshLibrary) ?? true;
+  keepScreenAwake.value = prefs.getBool(Preferences.keepScreenAwake) ?? true;
+  volumeKeyPaging.value = prefs.getBool(Preferences.volumeKeyPaging) ?? false;
+  showPageNumber.value = prefs.getBool(Preferences.showPageNumber) ?? true;
   orientationPreference.value = OrientationPreference.values.firstWhere(
     (value) =>
-        value.name == (prefs.getString('orientationPreference') ?? 'auto'),
+        value.name ==
+        (prefs.getString(Preferences.orientationPreference) ?? 'auto'),
     orElse: () => OrientationPreference.auto,
   );
   readerBackground.value = ReaderBackground.values.firstWhere(
-    (value) => value.name == (prefs.getString('readerBackground') ?? 'black'),
+    (value) =>
+        value.name ==
+        (prefs.getString(Preferences.readerBackground) ?? 'black'),
     orElse: () => ReaderBackground.black,
   );
   await _applyOrientationPreference(orientationPreference.value);
@@ -94,48 +99,20 @@ Future<void> refreshLibraryIfConfigured({
 }
 
 Future<void> refreshLibrary() async {
-  final generation = ++_refreshGeneration;
   final rawPath = scanDirectoryPath.value;
   if (rawPath.isEmpty) return;
-
-  isScanning.value = true;
-  errorMessage.value = null;
-  try {
-    final snapshot = await comicLibrary.refresh(rawPath);
-    if (generation != _refreshGeneration) return;
-    librarySnapshot.value = snapshot;
-    libraryEntries.value = snapshot.entries.map(_toRustEntry).toList();
-    errorMessage.value = snapshot.message;
-  } catch (e) {
-    if (generation != _refreshGeneration) return;
-    errorMessage.value = '扫描失败: $e';
-  } finally {
-    if (generation == _refreshGeneration) isScanning.value = false;
-  }
+  // 先在 await 前同步进入 loading，保证 UI 只看一个快照也能反映扫描中状态。
+  librarySnapshot.value = librarySnapshot.value.copyWith(
+    status: LibraryStatus.loading,
+    message: null,
+  );
+  // comicLibrary 内部按代际守卫，返回的必然是最新的快照。
+  librarySnapshot.value = await comicLibrary.refresh(rawPath);
 }
-
-LibraryEntry _toRustEntry(ComicLibraryEntry entry) => LibraryEntry(
-  filePath: entry.path,
-  title: entry.title,
-  author: null,
-  publisher: null,
-  description: null,
-  genres: const [],
-  year: null,
-  format: entry.format,
-  fileSize: BigInt.from(entry.fileSize),
-  totalPages: BigInt.from(entry.totalPages),
-  coverData: entry.coverData,
-  addedAt: BigInt.from(entry.addedAt),
-  lastOpenedAt: entry.lastReadAt == null
-      ? null
-      : BigInt.from(entry.lastReadAt!),
-);
 
 Future<void> setScanPath(String path) async {
   scanDirectoryPath.value = path;
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('scanPath', path);
+  await (await _prefs()).setString(Preferences.scanPath, path);
   await refreshLibrary();
 }
 
@@ -154,27 +131,27 @@ Future<LibraryRootChoice> chooseAndSetLibraryRoot({
 void searchLibraryEntries(String query) {
   final snapshot = comicLibrary.search(query);
   librarySnapshot.value = snapshot;
-  libraryEntries.value = snapshot.entries.map(_toRustEntry).toList();
 }
 
 void sortLibraryEntries(LibrarySort sort) {
   final snapshot = comicLibrary.sortBy(sort);
   librarySnapshot.value = snapshot;
-  libraryEntries.value = snapshot.entries.map(_toRustEntry).toList();
 }
 
 Future<void> setReaderMode(ReaderMode mode) async {
   readerMode.value = mode;
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('readerMode', mode.storageValue);
+  await (await _prefs()).setString(Preferences.readerMode, mode.storageValue);
 }
 
 Future<void> setDarkMode(bool dark) async {
   isDarkMode.value = dark;
   themePreference.value = dark ? ThemePreference.dark : ThemePreference.light;
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('isDarkMode', dark);
-  await prefs.setString('themePreference', themePreference.value.name);
+  final prefs = await _prefs();
+  await prefs.setBool(Preferences.isDarkMode, dark);
+  await prefs.setString(
+    Preferences.themePreference,
+    themePreference.value.name,
+  );
 }
 
 Future<void> setThemePreference(ThemePreference preference) async {
@@ -182,39 +159,39 @@ Future<void> setThemePreference(ThemePreference preference) async {
   if (preference != ThemePreference.system) {
     isDarkMode.value = preference == ThemePreference.dark;
   }
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('themePreference', preference.name);
+  await (await _prefs()).setString(
+    Preferences.themePreference,
+    preference.name,
+  );
 }
 
 Future<void> setAutoRefreshLibrary(bool value) async {
   autoRefreshLibrary.value = value;
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('autoRefreshLibrary', value);
+  await (await _prefs()).setBool(Preferences.autoRefreshLibrary, value);
 }
 
 Future<void> setKeepScreenAwake(bool value) async {
   keepScreenAwake.value = value;
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('keepScreenAwake', value);
+  await (await _prefs()).setBool(Preferences.keepScreenAwake, value);
 }
 
 Future<void> setVolumeKeyPaging(bool value) async {
   volumeKeyPaging.value = value;
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('volumeKeyPaging', value);
+  await (await _prefs()).setBool(Preferences.volumeKeyPaging, value);
 }
 
 Future<void> setShowPageNumber(bool value) async {
   showPageNumber.value = value;
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('showPageNumber', value);
+  await (await _prefs()).setBool(Preferences.showPageNumber, value);
 }
 
 Future<void> setOrientationPreference(OrientationPreference value) async {
   orientationPreference.value = value;
   await _applyOrientationPreference(value);
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('orientationPreference', value.name);
+  await (await _prefs()).setString(
+    Preferences.orientationPreference,
+    value.name,
+  );
 }
 
 Future<void> _applyOrientationPreference(OrientationPreference value) {
@@ -228,6 +205,5 @@ Future<void> _applyOrientationPreference(OrientationPreference value) {
 
 Future<void> setReaderBackground(ReaderBackground value) async {
   readerBackground.value = value;
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('readerBackground', value.name);
+  await (await _prefs()).setString(Preferences.readerBackground, value.name);
 }
