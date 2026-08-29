@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:signals_flutter/signals_flutter.dart';
 
 import '../../models/reader_mode.dart';
 import '../../models/settings_options.dart';
@@ -12,6 +13,7 @@ import '../../reading/reading_records.dart';
 import '../../reader/frb_reader_engine.dart';
 import '../../reader/reader_engine.dart';
 import '../../reader/reader_session.dart';
+import '../../reader/reader_bookmarks.dart';
 import '../../signals/app_signals.dart';
 
 class ComicReaderScreen extends StatefulWidget {
@@ -41,7 +43,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
   ReaderMode _readerMode = ReaderMode.vertical;
   bool _toolbarVisible = false;
   final Set<int> _failedPages = <int>{};
-  final Set<int> _bookmarkedPages = <int>{};
+  late final ReaderBookmarks _bookmarks;
 
   @override
   void initState() {
@@ -59,22 +61,11 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
     _readerMode = readerMode.value;
     _enterFullscreen();
     _session.open();
-    _loadBookmarks();
-  }
-
-  Future<void> _loadBookmarks() async {
-    try {
-      final bookmarks = await readingRecords.bookmarksFor(widget.filePath);
-      if (!mounted) return;
-      setState(() {
-        _bookmarkedPages
-          ..clear()
-          ..addAll(bookmarks.map((bookmark) => bookmark.pageIndex));
-      });
-    } catch (_) {
-      // Bookmark state is an enhancement; reading remains available if it
-      // cannot be loaded.
-    }
+    _bookmarks = ReaderBookmarks(
+      filePath: widget.filePath,
+      records: widget.records ?? readingRecords,
+    );
+    unawaited(_bookmarks.load());
   }
 
   @override
@@ -407,17 +398,23 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
                               ),
                           ],
                         ),
-                        IconButton(
-                          key: const Key('reader-bookmark'),
-                          tooltip: _bookmarkedPages.contains(ready.currentPage)
-                              ? '取消书签'
-                              : '添加书签',
-                          onPressed: () => _toggleBookmark(ready.currentPage),
-                          icon: Icon(
-                            _bookmarkedPages.contains(ready.currentPage)
-                                ? Icons.bookmark
-                                : Icons.bookmark_add_outlined,
-                          ),
+                        SignalBuilder(
+                          builder: (context) {
+                            final bookmarked = _bookmarks.pages.value.contains(
+                              ready.currentPage,
+                            );
+                            return IconButton(
+                              key: const Key('reader-bookmark'),
+                              tooltip: bookmarked ? '取消书签' : '添加书签',
+                              onPressed: () =>
+                                  _toggleBookmark(ready.currentPage),
+                              icon: Icon(
+                                bookmarked
+                                    ? Icons.bookmark
+                                    : Icons.bookmark_add_outlined,
+                              ),
+                            );
+                          },
                         ),
                         IconButton(
                           tooltip: '退出全屏',
@@ -449,31 +446,16 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
   );
 
   Future<void> _toggleBookmark(int page) async {
-    try {
-      if (_bookmarkedPages.contains(page)) {
-        await readingRecords.removeBookmark(widget.filePath, page);
-        if (mounted) {
-          setState(() => _bookmarkedPages.remove(page));
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('已取消书签')));
-        }
-      } else {
-        await readingRecords.addBookmark(widget.filePath, page);
-        if (mounted) {
-          setState(() => _bookmarkedPages.add(page));
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('已添加书签')));
-        }
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('书签操作失败，请重试')));
-      }
-    }
+    final result = await _bookmarks.toggle(page);
+    if (!mounted) return;
+    final message = switch (result) {
+      BookmarkToggleResult.added => '已添加书签',
+      BookmarkToggleResult.removed => '已取消书签',
+      BookmarkToggleResult.failed => '书签操作失败，请重试',
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Color _backgroundColor(BuildContext context) =>
