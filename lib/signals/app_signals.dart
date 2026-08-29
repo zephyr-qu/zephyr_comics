@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import '../models/reader_mode.dart';
 import '../models/settings_options.dart';
-import '../src/rust/library_db.dart' show LibraryEntry;
+import '../src/rust/library/db.dart' show LibraryEntry;
 import '../src/rust/api/comic.dart' show scanDirectoryToLibrary;
 import '../library/comic_library.dart';
 import '../library/library_root_access.dart';
@@ -34,11 +34,12 @@ final librarySnapshot = signal<LibrarySnapshot>(
   const LibrarySnapshot(status: LibraryStatus.initial, entries: []),
 );
 final readingRecords = ReadingRecords(adapter: FrbReadingRecordsAdapter());
+int _refreshGeneration = 0;
 
 class _RustComicLibraryAdapter implements ComicLibraryAdapter {
   @override
   Future<List<ComicLibraryEntry>> scan(String rootPath) async {
-    final entries = scanDirectoryToLibrary(path: rootPath);
+    final entries = await scanDirectoryToLibrary(path: rootPath);
     return entries
         .map(
           (entry) => ComicLibraryEntry(
@@ -83,28 +84,17 @@ Future<void> loadPreferences() async {
     orElse: () => ReaderBackground.black,
   );
   await _applyOrientationPreference(orientationPreference.value);
-  if (scanDirectoryPath.value.isNotEmpty) {
-    await refreshLibrary();
-  }
 }
 
-/// 将 Android SAF content URI 转换为显示用的路径
-/// content://.../tree/primary%3ADocuments%2FComics → /storage/emulated/0/Documents/Comics
-String resolveToDisplayPath(String path) {
-  if (!path.startsWith('content://')) return path;
-  try {
-    final uri = Uri.parse(path);
-    final treePath = uri.pathSegments.last; // "primary%3ADocuments%2FComics"
-    final decoded = Uri.decodeComponent(treePath);
-    if (decoded.startsWith('primary:')) {
-      return '/storage/emulated/0/${decoded.substring(8)}';
-    }
-    return '/storage/$decoded';
-  } catch (_) {}
-  return path;
+Future<void> refreshLibraryIfConfigured({
+  Future<void> Function()? refresh,
+}) async {
+  if (!autoRefreshLibrary.value || scanDirectoryPath.value.isEmpty) return;
+  await (refresh ?? refreshLibrary)();
 }
 
 Future<void> refreshLibrary() async {
+  final generation = ++_refreshGeneration;
   final rawPath = scanDirectoryPath.value;
   if (rawPath.isEmpty) return;
 
@@ -112,13 +102,15 @@ Future<void> refreshLibrary() async {
   errorMessage.value = null;
   try {
     final snapshot = await comicLibrary.refresh(rawPath);
+    if (generation != _refreshGeneration) return;
     librarySnapshot.value = snapshot;
     libraryEntries.value = snapshot.entries.map(_toRustEntry).toList();
     errorMessage.value = snapshot.message;
   } catch (e) {
+    if (generation != _refreshGeneration) return;
     errorMessage.value = '扫描失败: $e';
   } finally {
-    isScanning.value = false;
+    if (generation == _refreshGeneration) isScanning.value = false;
   }
 }
 

@@ -9,3 +9,5 @@ Zephyr Comics targets a personally sideloaded Android 11+ application and reads 
 ## Consequences
 
 The MVP is not designed for Google Play distribution. Comic source files remain read-only, and application code must never delete or rewrite them.
+
+The SAF-era scaffolding (SAF MethodChannel, copy-to-cache pipeline, path mappers, and the legacy READ/WRITE_EXTERNAL_STORAGE permissions) has been removed; the app exposes a single storage channel for all-files access only.
