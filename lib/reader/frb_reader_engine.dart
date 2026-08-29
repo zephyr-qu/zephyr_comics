@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import '../src/rust/api/comic.dart' as rust;
+import '../src/rust/api/reader.dart' as rust;
 import 'reader_engine.dart';
 
 final class FrbReaderEngine implements ReaderEngine {

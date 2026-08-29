@@ -2,7 +2,7 @@ import 'package:signals_flutter/signals_flutter.dart';
 import 'package:flutter/services.dart';
 import '../models/reader_mode.dart';
 import '../models/settings_options.dart';
-import '../src/rust/api/comic.dart' show scanDirectoryToLibrary;
+import '../src/rust/api/library.dart' show scanDirectoryToLibrary;
 import '../library/comic_library.dart';
 import '../library/library_root_access.dart';
 import '../reading/reading_records.dart';

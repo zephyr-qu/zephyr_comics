@@ -10,17 +10,19 @@
 //! ```text
 //! lib.rs (入口)
 //! ├── api/       # FFI 接口 (flutter_rust_bridge)
-//! ├── archive/   # 压缩包解压 (CBZ)
-//! ├── decoder/   # 图像解码 (并行处理)
-//! ├── cache/     # LRU 缓存管理 (内存 + 磁盘)
-//! ├── sort/      # 智能排序
-//! ├── types/     # 数据类型定义
-//! └── error/     # 错误处理
+//! ├── archive.rs       # 压缩包解压 (CBZ)
+//! ├── decoder.rs       # 图像解码 (并行处理)
+//! ├── cache/           # 内存、磁盘和压缩包缓存
+//! ├── library/         # 图书馆、数据库和阅读进度
+//! ├── preload/         # 预加载策略
+//! ├── sort.rs          # 智能排序
+//! ├── types.rs         # 数据类型定义
+//! └── error.rs         # 错误处理
 //! ```
 //!
 //! # 快速开始
 //! ```rust,no_run
-//! use rust_lib_zephyr_comics::api::comic::{init_app, get_comic_info, get_page_image};
+//! use rust_lib_zephyr_comics::api::{init::init_app, reader::{get_comic_info, get_page_image}};
 //!
 //! // 1. 初始化引擎
 //! init_app();
@@ -40,17 +42,31 @@ mod archive;
 mod cache;
 mod decoder;
 mod error;
+mod library;
+mod preload;
 mod sort;
 mod types;
 
 // 扩展模块
-mod archive_cache;
-mod disk_cache;
-mod library_db;
-mod library_scanner;
 mod metadata;
-mod preload_strategy;
-mod reading_progress;
+mod archive_cache {
+    pub use crate::cache::archive::*;
+}
+mod disk_cache {
+    pub use crate::cache::disk::*;
+}
+mod library_db {
+    pub use crate::library::db::*;
+}
+mod library_scanner {
+    pub use crate::library::scanner::*;
+}
+mod preload_strategy {
+    pub use crate::preload::strategy::*;
+}
+mod reading_progress {
+    pub use crate::library::progress::*;
+}
 
 // 重新导出常用类型，方便外部使用
 pub use archive_cache::{

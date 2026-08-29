@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:zephyr_comics/src/rust/api/comic.dart' as rust;
+import 'package:zephyr_comics/src/rust/api/reader.dart' as rust;
 import 'package:zephyr_comics/src/rust/frb_generated.dart';
 
 const benchmarkCbz = String.fromEnvironment('READER_BENCHMARK_CBZ');

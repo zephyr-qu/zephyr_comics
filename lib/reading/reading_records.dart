@@ -1,4 +1,4 @@
-import '../src/rust/api/comic.dart' as rust;
+import '../src/rust/api/progress.dart' as rust;
 import '../src/rust/library/progress.dart' as rust_progress;
 
 /// Product-facing progress; FRB/SQLite types never cross this boundary.
