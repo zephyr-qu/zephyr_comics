@@ -5,7 +5,7 @@ import 'package:zephyr_comics/library/comic_library.dart';
 import 'package:zephyr_comics/views/history/history_screen.dart';
 
 void main() {
-  testWidgets('top refresh reloads history and waits for completion', (
+  testWidgets('pull to refresh reloads history and waits for completion', (
     tester,
   ) async {
     final adapter = _FakeReadingRecordsAdapter([
@@ -24,12 +24,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('阅读记录'), findsOneWidget);
+    expect(find.text('1 条 · 按最后阅读时间'), findsOneWidget);
     expect(adapter.historyCalls, 1);
-    await tester.tap(find.byIcon(Icons.refresh));
+
+    // Refreshing is a pull gesture now — the page carries no toolbar button.
+    await tester.fling(find.byType(ListView), const Offset(0, 300), 1000);
     await tester.pumpAndSettle();
 
     expect(adapter.historyCalls, 2);
-    expect(find.text('one.cbz'), findsOneWidget);
+    expect(find.text('one.cbz'), findsWidgets);
   });
 
   testWidgets('injected library entries resolve title and cover source', (
@@ -63,7 +67,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('One'), findsOneWidget);
+    // The most recent record is promoted into the resume card and also stays in
+    // the list below it, exactly as the prototype renders it.
+    expect(find.text('One'), findsNWidgets(2));
+    expect(find.text('继续阅读'), findsOneWidget);
+    expect(find.text('读至第 2 页 · 共 10 页'), findsOneWidget);
     expect(find.textContaining('第 2 / 10 页'), findsOneWidget);
   });
 

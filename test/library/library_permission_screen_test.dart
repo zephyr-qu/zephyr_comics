@@ -9,7 +9,7 @@ void main() {
   const storageChannel = MethodChannel('com.zephyr.comics/storage');
 
   setUp(() {
-    scanDirectoryPath.value = '';
+    settings.reset();
     librarySnapshot.value = const LibrarySnapshot(
       status: LibraryStatus.initial,
       entries: [],
@@ -31,7 +31,7 @@ void main() {
   ) async {
     await tester.pumpWidget(const MaterialApp(home: LibraryScreen()));
 
-    await tester.tap(find.text('选择漫画目录'));
+    await tester.tap(find.text('选择漫画根目录'));
     await tester.pumpAndSettle();
 
     expect(find.text('需要访问漫画文件'), findsOneWidget);

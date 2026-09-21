@@ -254,6 +254,51 @@ void main() {
     await session.close();
   });
 
+  test(
+    'repeating the current page does not publish duplicate snapshots',
+    () async {
+      final engine = FakeReaderEngine(totalPages: 12);
+      final records = await recordsWith(savedPage: 5, totalPages: 12);
+      final session = ReaderSession(
+        filePath: 'book.cbz',
+        engine: engine,
+        records: records,
+      );
+      await session.open();
+
+      var notifications = 0;
+      session.snapshot.addListener(() => notifications++);
+
+      session.moveTo(5);
+      session.moveTo(5);
+
+      expect(notifications, 0);
+      await session.close();
+    },
+  );
+
+  test(
+    'canceled page requests are distinguishable from decode failures',
+    () async {
+      final engine = GatedPageReaderEngine(totalPages: 20);
+      final records = await recordsWith(totalPages: 20);
+      final session = ReaderSession(
+        filePath: 'book.cbz',
+        engine: engine,
+        records: records,
+      );
+      await session.open();
+      await Future<void>.delayed(Duration.zero);
+
+      final stalePage = session.loadPage(2);
+      session.moveTo(15);
+
+      await expectLater(stalePage, throwsA(isA<ReaderPageRequestCancelled>()));
+      await releaseRequestedPages(engine);
+      await session.close();
+    },
+  );
+
   test('returning to an active page retains the shared result', () async {
     final engine = GatedPageReaderEngine(totalPages: 12);
     final records = await recordsWith(savedPage: 5, totalPages: 12);
@@ -304,6 +349,57 @@ void main() {
     await Future<void>.delayed(Duration.zero);
   });
 
+  test('foreground page requests bypass stale active prefetches', () async {
+    final engine = GatedPageReaderEngine(totalPages: 20);
+    final records = await recordsWith(totalPages: 20);
+    final session = ReaderSession(
+      filePath: 'book.cbz',
+      engine: engine,
+      records: records,
+    );
+    await session.open();
+    expect(engine.loads, [0, 1]);
+
+    session.moveTo(10);
+    final visiblePage = session.loadPage(10);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(engine.loads, contains(10));
+    await releaseRequestedPages(engine);
+    await visiblePage;
+    await session.close();
+  });
+
+  test(
+    'deferred moves keep prefetch window stable until scrolling settles',
+    () async {
+      final engine = GatedPageReaderEngine(totalPages: 20);
+      final records = await recordsWith(totalPages: 20);
+      final session = ReaderSession(
+        filePath: 'book.cbz',
+        engine: engine,
+        records: records,
+      );
+      await session.open();
+      expect(engine.loads, [0, 1]);
+
+      session.moveTo(10, deferPrefetch: true);
+      final visiblePage = session.loadPage(10);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(engine.loads, contains(10));
+      expect(session.cachedPageIndexes, contains(0));
+
+      session.prefetchCurrentWindow();
+      await releaseRequestedPages(engine);
+      await visiblePage;
+
+      expect(session.cachedPageIndexes, contains(10));
+      expect(session.cachedPageIndexes, isNot(contains(0)));
+      await session.close();
+    },
+  );
+
   test('the latest current page replaces obsolete queued work', () async {
     final engine = GatedPageReaderEngine(totalPages: 15);
     final records = await recordsWith();
@@ -320,7 +416,7 @@ void main() {
     engine.gates[0]!.complete();
     await Future<void>.delayed(Duration.zero);
 
-    expect(engine.loads, [0, 1, 10]);
+    expect(engine.loads, [0, 1, 5, 10]);
     await releaseRequestedPages(engine);
     await session.close();
   });
@@ -344,9 +440,9 @@ void main() {
       await releaseRequestedPages(engine);
       await Future.wait(requests);
 
-      expect(engine.loads.length, lessThanOrEqualTo(7));
-      expect(engine.maxActiveLoads, 2);
-      expect(session.cachedPageIndexes.length, lessThanOrEqualTo(7));
+      expect(engine.loads.length, lessThanOrEqualTo(11));
+      expect(engine.maxActiveLoads, lessThanOrEqualTo(3));
+      expect(session.cachedPageIndexes.length, lessThanOrEqualTo(11));
       await session.close();
     },
   );
