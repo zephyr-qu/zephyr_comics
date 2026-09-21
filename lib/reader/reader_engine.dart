@@ -23,8 +23,25 @@ final class ReaderFailure implements Exception {
 }
 
 final class ReaderBook {
-  const ReaderBook({required this.totalPages});
+  const ReaderBook({required this.totalPages, this.pageLayouts = const []});
   final int totalPages;
+  final List<ReaderPageLayout> pageLayouts;
+}
+
+final class ReaderPageLayout {
+  const ReaderPageLayout({required this.width, required this.height});
+
+  static const fallback = ReaderPageLayout(width: 10, height: 14);
+
+  final int width;
+  final int height;
+
+  double displayHeight(double displayWidth) {
+    if (width <= 0 || height <= 0) {
+      return displayWidth * fallback.height / fallback.width;
+    }
+    return displayWidth * height / width;
+  }
 }
 
 final class ReaderPage {

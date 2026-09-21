@@ -15,16 +15,28 @@ final class ReaderReady extends ReaderSnapshot {
   const ReaderReady({
     required this.currentPage,
     required this.totalPages,
+    this.pageLayouts = const [],
     this.warning,
   });
   final int currentPage;
   final int totalPages;
+  final List<ReaderPageLayout> pageLayouts;
   final ReaderFailure? warning;
+
+  ReaderPageLayout layoutFor(int pageIndex) =>
+      pageIndex >= 0 && pageIndex < pageLayouts.length
+      ? pageLayouts[pageIndex]
+      : ReaderPageLayout.fallback;
 }
 
 final class ReaderFailed extends ReaderSnapshot {
   const ReaderFailed(this.failure);
   final ReaderFailure failure;
+}
+
+/// A queued page request was superseded by a newer viewport target.
+final class ReaderPageRequestCancelled implements Exception {
+  const ReaderPageRequestCancelled();
 }
 
 final class ReaderSession {
@@ -33,7 +45,6 @@ final class ReaderSession {
     required this.engine,
     required this.records,
     this.initialPage,
-    this.preserveProgressOnStart = false,
     this.saveDelay = const Duration(milliseconds: 400),
   });
 
@@ -41,13 +52,14 @@ final class ReaderSession {
   final ReaderEngine engine;
   final ReadingRecords records;
   final int? initialPage;
-  final bool preserveProgressOnStart;
   final Duration saveDelay;
   final snapshot = ValueNotifier<ReaderSnapshot>(const ReaderOpening());
-  static const int _prefetchAhead = 4;
+  static const int _prefetchAhead = 8;
   static const int _prefetchBehind = 2;
   static const int _maxConcurrentPageLoads = 2;
   static const int _maxPendingPageLoads = _prefetchAhead + _prefetchBehind + 1;
+  static const int _maxPriorityPageLoads = _maxConcurrentPageLoads + 1;
+  static const Duration _deferredWindowDelay = Duration(milliseconds: 160);
 
   final Map<int, _PageRequest> _pages = {};
   final Map<int, _PageRequest> _queuedPages = {};
@@ -57,6 +69,7 @@ final class ReaderSession {
   Set<int> _desiredPages = const {};
   int _readingDirection = 1;
   Timer? _saveTimer;
+  Timer? _deferredWindowTimer;
   bool _closed = false;
   Future<void> _saveQueue = Future<void>.value();
 
@@ -79,6 +92,7 @@ final class ReaderSession {
       snapshot.value = ReaderReady(
         currentPage: page,
         totalPages: book.totalPages,
+        pageLayouts: book.pageLayouts,
       );
       _schedulePageWindow(page, book.totalPages);
     } catch (error) {
@@ -87,7 +101,7 @@ final class ReaderSession {
     }
   }
 
-  Future<ReaderPage> loadPage(int pageIndex) {
+  Future<ReaderPage> loadPage(int pageIndex, {bool foreground = true}) {
     if (_closed) {
       return Future.error(StateError('阅读会话已关闭'));
     }
@@ -96,7 +110,7 @@ final class ReaderSession {
       return Future.error(StateError('阅读会话尚未就绪'));
     }
     final index = pageIndex.clamp(0, ready.totalPages - 1).toInt();
-    return _requestPage(index, foreground: true);
+    return _requestPage(index, foreground: foreground);
   }
 
   Future<void> retryPage(int pageIndex) async {
@@ -114,22 +128,46 @@ final class ReaderSession {
     await _requestPage(index, foreground: true);
   }
 
-  void moveTo(int pageIndex) {
+  void moveTo(int pageIndex, {bool deferPrefetch = false}) {
     final ready = snapshot.value;
     if (ready is! ReaderReady || _closed) return;
     final index = pageIndex.clamp(0, ready.totalPages - 1).toInt();
+    if (index == ready.currentPage) {
+      if (!deferPrefetch) _schedulePageWindow(index, ready.totalPages);
+      return;
+    }
     final delta = index - ready.currentPage;
-    final moved = delta != 0;
-    if (delta != 0) _readingDirection = delta.sign;
+    _readingDirection = delta.sign;
     snapshot.value = ReaderReady(
       currentPage: index,
       totalPages: ready.totalPages,
+      pageLayouts: ready.pageLayouts,
       warning: ready.warning,
     );
-    _schedulePageWindow(index, ready.totalPages);
-    if (moved || !preserveProgressOnStart) {
-      _saveTimer?.cancel();
-      _saveTimer = Timer(saveDelay, () => _enqueuePersist(index));
+    if (deferPrefetch) {
+      _prioritizePage(index);
+      _deferredWindowTimer?.cancel();
+      _deferredWindowTimer = Timer(_deferredWindowDelay, () {
+        if (_closed) return;
+        final current = snapshot.value;
+        if (current is ReaderReady && current.currentPage == index) {
+          _schedulePageWindow(index, current.totalPages);
+        }
+      });
+    } else {
+      _schedulePageWindow(index, ready.totalPages);
+    }
+    _saveTimer?.cancel();
+    _saveTimer = Timer(saveDelay, () => _enqueuePersist(index));
+  }
+
+  /// Rebuilds the normal prefetch window after a continuous scroll settles.
+  void prefetchCurrentWindow() {
+    if (_closed) return;
+    _deferredWindowTimer?.cancel();
+    final ready = snapshot.value;
+    if (ready is ReaderReady) {
+      _schedulePageWindow(ready.currentPage, ready.totalPages);
     }
   }
 
@@ -138,6 +176,7 @@ final class ReaderSession {
     _closed = true;
     final hadPendingSave = _saveTimer?.isActive ?? false;
     _saveTimer?.cancel();
+    _deferredWindowTimer?.cancel();
     _cancelQueuedPages();
     _pages.clear();
     final ready = snapshot.value;
@@ -165,6 +204,7 @@ final class ReaderSession {
           snapshot.value = ReaderReady(
             currentPage: ready.currentPage,
             totalPages: ready.totalPages,
+            pageLayouts: ready.pageLayouts,
             warning: _failure(error, ReaderFailureKind.persistence),
           );
         }
@@ -255,13 +295,42 @@ final class ReaderSession {
 
   void _pumpPageQueue() {
     if (_closed) return;
-    while (_activePages.length < _maxConcurrentPageLoads) {
+    while (_canStartNextPageLoad()) {
       final request = _takeNextRequest();
       if (request == null) return;
       _queuedPages.remove(request.pageIndex);
       _activePages[request.pageIndex] = request;
       unawaited(_performPageLoad(request));
     }
+  }
+
+  void _prioritizePage(int pageIndex) {
+    for (final request in _activePages.values) {
+      request.foreground = request.pageIndex == pageIndex;
+    }
+
+    final current = _queuedPages[pageIndex];
+    for (final request in List<_PageRequest>.of(_foregroundQueue)) {
+      if (request == current) continue;
+      _foregroundQueue.remove(request);
+      request.foreground = false;
+      _prefetchQueue.add(request);
+    }
+    if (current != null) {
+      _prefetchQueue.remove(current);
+      current.foreground = true;
+      _foregroundQueue.insert(0, current);
+    }
+    _pumpPageQueue();
+  }
+
+  bool _canStartNextPageLoad() {
+    if (_activePages.length < _maxConcurrentPageLoads) return true;
+    if (_foregroundQueue.isEmpty ||
+        _activePages.length >= _maxPriorityPageLoads) {
+      return false;
+    }
+    return _activePages.values.every((request) => !request.foreground);
   }
 
   _PageRequest? _takeNextRequest() {
@@ -283,6 +352,9 @@ final class ReaderSession {
       request.complete(
         ReaderPage(index: request.pageIndex, encodedBytes: bytes),
       );
+      if (request.foreground) {
+        _pages[request.pageIndex] = request;
+      }
     } catch (error, stackTrace) {
       request.completeError(
         _failure(error, ReaderFailureKind.pageDecode),
@@ -308,6 +380,11 @@ final class ReaderSession {
       if (index >= 0 && index < totalPages) desired.add(index);
     }
     _desiredPages = desired;
+    for (final request in _activePages.values) {
+      if (!_desiredPages.contains(request.pageIndex)) {
+        request.foreground = false;
+      }
+    }
     _pages.removeWhere((index, _) => !desired.contains(index));
     _cancelObsoleteQueuedRequests();
 
@@ -351,7 +428,7 @@ final class ReaderSession {
     _prefetchQueue.remove(request);
     _queuedPages.remove(request.pageIndex);
     _pages.remove(request.pageIndex);
-    request.completeError(StateError(reason));
+    request.completeError(const ReaderPageRequestCancelled());
   }
 
   void _cancelQueuedPages() {

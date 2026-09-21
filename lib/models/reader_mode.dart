@@ -5,12 +5,14 @@ enum ReaderMode {
   verticalContinuous,
   webtoon;
 
+  /// The prototype's own five labels (`SA_MODES`), shared by the settings row
+  /// and the reader drawer so the two controls name the same thing the same way.
   String get label {
     return switch (this) {
-      ReaderMode.vertical => '单页垂直',
-      ReaderMode.ltr => '从左到右',
-      ReaderMode.rtl => '从右到左',
-      ReaderMode.verticalContinuous => '连续滚动',
+      ReaderMode.vertical => '单页',
+      ReaderMode.ltr => '左开',
+      ReaderMode.rtl => '右开',
+      ReaderMode.verticalContinuous => '连续',
       ReaderMode.webtoon => '条漫',
     };
   }

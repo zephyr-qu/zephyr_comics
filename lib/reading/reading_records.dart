@@ -267,9 +267,14 @@ final class InMemoryReadingRecordsAdapter implements ReadingRecordsAdapter {
   }
 
   @override
-  Future<List<BookmarkRecord>> readBookmarks(String filePath) async =>
-      (_bookmarks[filePath]?.values.toList(growable: false) ?? const [])
-        ..sort((a, b) => a.pageIndex.compareTo(b.pageIndex));
+  Future<List<BookmarkRecord>> readBookmarks(String filePath) async {
+    // `?.values.toList(growable: false) ?? const []` cannot be sorted in place:
+    // const [] is unmodifiable, so a comic with no bookmarks would throw
+    // UnsupportedError instead of reporting an empty list.
+    final bookmarks =
+        _bookmarks[filePath]?.values.toList() ?? <BookmarkRecord>[];
+    return bookmarks..sort((a, b) => a.pageIndex.compareTo(b.pageIndex));
+  }
 
   @override
   Future<BookmarkRecord> addBookmark(

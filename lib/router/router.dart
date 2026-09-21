@@ -51,7 +51,6 @@ final GoRouter router = GoRouter(
         return ComicReaderScreen(
           filePath: launch.filePath,
           initialPage: launch.initialPage,
-          preserveProgressOnStart: launch.preserveProgressOnStart,
         );
       },
     ),

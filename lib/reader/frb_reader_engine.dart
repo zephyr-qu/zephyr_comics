@@ -11,7 +11,25 @@ final class FrbReaderEngine implements ReaderEngine {
       if (info.totalImages == BigInt.zero) {
         throw const ReaderFailure(ReaderFailureKind.emptyComic, '漫画文件中没有页面');
       }
-      return ReaderBook(totalPages: info.totalImages.toInt());
+      final totalPages = info.totalImages.toInt();
+      final nativeLayouts = await rust.getComicPageDimensions(
+        filePath: filePath,
+      );
+      return ReaderBook(
+        totalPages: totalPages,
+        pageLayouts: [
+          for (var index = 0; index < totalPages; index++)
+            if (index < nativeLayouts.length &&
+                nativeLayouts[index].width > 0 &&
+                nativeLayouts[index].height > 0)
+              ReaderPageLayout(
+                width: nativeLayouts[index].width,
+                height: nativeLayouts[index].height,
+              )
+            else
+              ReaderPageLayout.fallback,
+        ],
+      );
     } on ReaderFailure {
       rethrow;
     } catch (error) {
