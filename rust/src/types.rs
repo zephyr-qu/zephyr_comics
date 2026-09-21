@@ -62,6 +62,22 @@ pub struct EncodedPage {
     pub png_data: Vec<u8>,
 }
 
+/// Immutable page geometry used to lay out continuous reading before decode.
+#[derive(Debug, Clone, Copy)]
+pub struct PageDimensions {
+    pub width: i32,
+    pub height: i32,
+}
+
+impl PageDimensions {
+    pub fn fallback() -> Self {
+        Self {
+            width: 10,
+            height: 14,
+        }
+    }
+}
+
 impl ImageData {
     /// 创建新的 ImageData
     pub fn new(width: i32, height: i32, data: Vec<u8>) -> Self {

@@ -6,7 +6,6 @@
 //! - ZIP (CBZ) 文件解压
 //! - 文件列表智能排序
 
-use std::fs::File;
 use std::path::Path;
 
 use crate::error::{ComicError, Result};
@@ -59,22 +58,7 @@ pub fn get_comic_info(file_path: &str) -> Result<ComicInfo> {
 
 /// 从 ZIP 文件提取内容列表
 fn extract_zip_contents(file_path: &str) -> Result<Vec<ChapterInfo>> {
-    let file = File::open(file_path)?;
-    let mut archive = zip::ZipArchive::new(file)?;
-
-    let mut files: Vec<String> = Vec::with_capacity(archive.len());
-
-    for i in 0..archive.len() {
-        let entry = archive.by_index(i)?;
-        let name = entry.name().to_string();
-
-        // 跳过目录和非图像文件
-        if !entry.is_file() {
-            continue;
-        }
-
-        files.push(name);
-    }
+    let files = crate::archive_cache::list_files_from_cache(file_path)?;
 
     // 过滤并排序图像文件
     let image_files = filter_image_files(&files);
@@ -105,6 +89,15 @@ fn extract_zip_contents(file_path: &str) -> Result<Vec<ChapterInfo>> {
 pub fn extract_file_from_archive(file_path: &str, file_name: &str) -> Result<Vec<u8>> {
     // ponytail: only CBZ supported, use archive cache
     crate::archive_cache::extract_file_from_cache(file_path, file_name)
+}
+
+/// Read a bounded archive-entry prefix for metadata inspection.
+pub fn extract_file_prefix_from_archive(
+    file_path: &str,
+    file_name: &str,
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
+    crate::archive_cache::extract_file_prefix_from_cache(file_path, file_name, max_bytes)
 }
 
 /// 检查文件是否为有效的漫画格式

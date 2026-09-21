@@ -9,8 +9,7 @@
 //! - 智能预取：根据阅读速度动态调整预加载数量
 
 /// 阅读方向
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ReadingDirection {
     /// 左到右 (美漫/国漫)
     #[default]
@@ -22,7 +21,6 @@ pub enum ReadingDirection {
     /// 自动 (根据内容判断)
     Auto,
 }
-
 
 /// 预加载策略配置
 #[derive(Debug, Clone)]
@@ -348,7 +346,4 @@ mod tests {
         let pages = strategy.calculate_smart_pages(5, 20, 15000); // 15 秒/页
         assert!(pages.len() <= 2);
     }
-
 }
-
-

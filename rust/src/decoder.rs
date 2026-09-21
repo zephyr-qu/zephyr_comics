@@ -310,8 +310,6 @@ mod tests {
         data
     }
 
-
-
     #[test]
     fn test_calculate_target_dimensions() {
         // 小尺寸不变
@@ -355,5 +353,3 @@ mod tests {
         assert!(!thumb.unwrap().is_empty());
     }
 }
-
-

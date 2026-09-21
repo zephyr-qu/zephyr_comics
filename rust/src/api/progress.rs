@@ -1,12 +1,10 @@
 //! 阅读进度、书签、历史与阅读统计接口。
 
-
-
-use flutter_rust_bridge::frb;
-use std::sync::{Arc, Mutex};
 use crate::error::{ComicError, Result};
 use crate::library_db::get_global_db;
-use crate::reading_progress::{Bookmark, current_timestamp, ReadingProgress, ReadingStats};
+use crate::reading_progress::{current_timestamp, Bookmark, ReadingProgress, ReadingStats};
+use flutter_rust_bridge::frb;
+use std::sync::{Arc, Mutex};
 
 /// 保存阅读进度，Rust 侧统一计算完成度与时间戳
 ///
@@ -206,8 +204,8 @@ pub fn get_reading_stats() -> ReadingStats {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::init::init_app;
     use super::*;
+    use crate::api::init::init_app;
 
     #[tokio::test]
     async fn reading_history_propagates_database_lock_failure() {
@@ -272,4 +270,3 @@ mod tests {
         assert!(bookmarks.is_empty());
     }
 }
-

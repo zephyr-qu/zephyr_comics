@@ -1,14 +1,39 @@
 //! 漫画页面解码、预加载、缩略图与格式校验接口。
 
-
-
-use flutter_rust_bridge::frb;
-use crate::archive::{extract_file_from_archive, get_comic_info as archive_get_info, is_valid_comic_file};
+use crate::api::init::{DECODER, DEFAULT_MAX_HEIGHT, DEFAULT_MAX_WIDTH, PRELOAD_MANAGER};
+use crate::archive::{
+    extract_file_from_archive, extract_file_prefix_from_archive,
+    get_comic_info as archive_get_info, is_valid_comic_file,
+};
 use crate::error::{ComicError, Result};
 use crate::metadata::{extract_metadata, ComicMetadata};
-use crate::preload_strategy::{PreloadStrategy, ReadingDirection};
-use crate::types::{ComicInfo, EncodedPage, ImageData, ThumbnailData};
-use crate::api::init::{PRELOAD_MANAGER, DECODER, DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT};
+use crate::preload_strategy::{PreloadManager, PreloadStrategy, ReadingDirection};
+use crate::types::{ComicInfo, EncodedPage, ImageData, PageDimensions, ThumbnailData};
+use flutter_rust_bridge::frb;
+
+/// Run a blocking archive/decode operation on the blocking pool instead of an
+/// async worker thread. `zip`, `image`, and `rusqlite` are synchronous, so
+/// calling them from an async fn would stall the runtime for every other task.
+async fn blocking<T, F>(work: F) -> Result<T>
+where
+    F: FnOnce() -> Result<T> + Send + 'static,
+    T: Send + 'static,
+{
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|error| ComicError::Internal(format!("后台任务失败：{}", error)))?
+}
+
+/// Lock the preload manager, recovering from a poisoned mutex rather than
+/// panicking across the FFI boundary.
+fn preload_manager() -> Option<std::sync::MutexGuard<'static, PreloadManager>> {
+    PRELOAD_MANAGER.get().map(|manager| {
+        manager.lock().unwrap_or_else(|error| {
+            log::error!("预加载管理器锁中毒，继续使用：{}", error);
+            error.into_inner()
+        })
+    })
+}
 
 /// 获取漫画文件信息
 ///
@@ -20,6 +45,64 @@ use crate::api::init::{PRELOAD_MANAGER, DECODER, DEFAULT_MAX_WIDTH, DEFAULT_MAX_
 pub fn get_comic_info(file_path: String) -> Result<ComicInfo> {
     log::debug!("获取漫画信息：{}", file_path);
     archive_get_info(&file_path)
+}
+
+/// Read every page's geometry before Flutter builds a continuous scroll list.
+///
+/// Only an encoded-image prefix is inspected in the common case; pixels are
+/// never decoded and the original page payload remains the reader fast path.
+#[frb(dart_async)]
+pub async fn get_comic_page_dimensions(file_path: String) -> Result<Vec<PageDimensions>> {
+    blocking(move || extract_comic_page_dimensions(&file_path)).await
+}
+
+const DIMENSION_PREFIX_BYTES: usize = 256 * 1024;
+
+fn extract_comic_page_dimensions(file_path: &str) -> Result<Vec<PageDimensions>> {
+    let info = archive_get_info(file_path)?;
+    let chapter = info
+        .chapters
+        .first()
+        .ok_or_else(|| ComicError::ArchiveError("漫画文件为空".to_string()))?;
+
+    Ok(chapter
+        .image_files
+        .iter()
+        .enumerate()
+        .map(|(index, file_name)| {
+            let dimensions =
+                extract_file_prefix_from_archive(file_path, file_name, DIMENSION_PREFIX_BYTES)
+                    .and_then(|prefix| read_encoded_dimensions(&prefix))
+                    .or_else(|_| {
+                        extract_file_from_archive(file_path, file_name)
+                            .and_then(|encoded| read_encoded_dimensions(&encoded))
+                    });
+            dimensions.unwrap_or_else(|error| {
+                log::warn!(
+                    "读取页面尺寸失败，使用稳定回退比例：{} #{} ({})",
+                    file_path,
+                    index,
+                    error
+                );
+                PageDimensions::fallback()
+            })
+        })
+        .collect())
+}
+
+fn read_encoded_dimensions(encoded: &[u8]) -> Result<PageDimensions> {
+    let reader = image::io::Reader::new(std::io::Cursor::new(encoded))
+        .with_guessed_format()
+        .map_err(|error| ComicError::DecodeError(format!("无法识别图片格式：{error}")))?;
+    let (width, height) = reader
+        .into_dimensions()
+        .map_err(|error| ComicError::DecodeError(format!("无法读取图片尺寸：{error}")))?;
+    Ok(PageDimensions {
+        width: i32::try_from(width)
+            .map_err(|_| ComicError::DecodeError("图片宽度超出支持范围".to_string()))?,
+        height: i32::try_from(height)
+            .map_err(|_| ComicError::DecodeError("图片高度超出支持范围".to_string()))?,
+    })
 }
 
 /// 获取指定页的图片数据
@@ -49,8 +132,18 @@ pub async fn get_page_image(
         max_height
     );
 
+    blocking(move || decode_page_image(&file_path, page_index, max_width, max_height)).await
+}
+
+/// Synchronous core of [`get_page_image`]; runs on the blocking pool.
+fn decode_page_image(
+    file_path: &str,
+    page_index: i32,
+    max_width: i32,
+    max_height: i32,
+) -> Result<ImageData> {
     // 获取漫画信息以获取文件列表
-    let info = archive_get_info(&file_path)?;
+    let info = archive_get_info(file_path)?;
 
     if info.chapters.is_empty() {
         return Err(ComicError::ArchiveError("漫画文件为空".to_string()));
@@ -80,10 +173,10 @@ pub async fn get_page_image(
 
     // 使用解码器解码
     if let Some(decoder) = DECODER.get() {
-        decoder.decode_from_archive(&file_path, file_name, max_w, max_h)
+        decoder.decode_from_archive(file_path, file_name, max_w, max_h)
     } else {
         // 解码器未初始化，使用便捷函数
-        crate::decoder::decode_page(&file_path, file_name, max_w, max_h)
+        crate::decoder::decode_page(file_path, file_name, max_w, max_h)
     }
 }
 
@@ -96,7 +189,7 @@ pub async fn get_page_image_png(
     max_height: i32,
 ) -> Result<EncodedPage> {
     let image = get_page_image(file_path, page_index, max_width, max_height).await?;
-    encode_page_png(image)
+    blocking(move || encode_page_png(image)).await
 }
 
 /// Extract a page in its original encoded image format.
@@ -106,7 +199,7 @@ pub async fn get_page_image_png(
 /// encoded image payload stored in the comic archive.
 #[frb(dart_async)]
 pub async fn get_page_image_encoded(file_path: String, page_index: i32) -> Result<Vec<u8>> {
-    extract_page_image_encoded(&file_path, page_index)
+    blocking(move || extract_page_image_encoded(&file_path, page_index)).await
 }
 
 fn extract_page_image_encoded(file_path: &str, page_index: i32) -> Result<Vec<u8>> {
@@ -192,8 +285,13 @@ pub struct ZeroCopyImageData {
 pub async fn generate_thumbnail(file_path: String, size: i32) -> Result<ThumbnailData> {
     log::debug!("生成缩略图：{} ({}x{})", file_path, size, size);
 
+    blocking(move || build_thumbnail(&file_path, size)).await
+}
+
+/// Synchronous core of [`generate_thumbnail`]; runs on the blocking pool.
+fn build_thumbnail(file_path: &str, size: i32) -> Result<ThumbnailData> {
     // 获取第一页
-    let info = archive_get_info(&file_path)?;
+    let info = archive_get_info(file_path)?;
 
     if info.chapters.is_empty() || info.chapters[0].image_files.is_empty() {
         return Err(ComicError::ArchiveError("漫画文件无图片".to_string()));
@@ -203,7 +301,7 @@ pub async fn generate_thumbnail(file_path: String, size: i32) -> Result<Thumbnai
     let size = size as u32;
 
     // 提取文件数据
-    let data = crate::archive::extract_file_from_archive(&file_path, first_file)?;
+    let data = crate::archive::extract_file_from_archive(file_path, first_file)?;
 
     // 生成缩略图
     let png_data = crate::decoder::generate_thumbnail(&data, size)?;
@@ -233,8 +331,18 @@ pub async fn preload_pages(
 ) -> Result<Vec<ImageData>> {
     log::debug!("预加载页面：{:?}", page_indices);
 
+    blocking(move || preload_page_images(&file_path, page_indices, max_width, max_height)).await
+}
+
+/// Synchronous core of [`preload_pages`]; runs on the blocking pool.
+fn preload_page_images(
+    file_path: &str,
+    page_indices: Vec<i32>,
+    max_width: i32,
+    max_height: i32,
+) -> Result<Vec<ImageData>> {
     // 获取漫画信息
-    let info = archive_get_info(&file_path)?;
+    let info = archive_get_info(file_path)?;
 
     if info.chapters.is_empty() {
         return Err(ComicError::ArchiveError("漫画文件为空".to_string()));
@@ -266,7 +374,7 @@ pub async fn preload_pages(
 
     // 并行解码
     if let Some(decoder) = DECODER.get() {
-        let results = decoder.decode_multiple_from_archive(&file_path, &file_names, max_w, max_h);
+        let results = decoder.decode_multiple_from_archive(file_path, &file_names, max_w, max_h);
 
         // 收集成功结果
         let mut images = Vec::with_capacity(results.len());
@@ -311,11 +419,7 @@ pub fn get_supported_formats() -> Vec<String> {
 #[frb(sync)]
 pub fn set_reading_direction(direction: ReadingDirection) {
     log::info!("设置阅读方向：{:?}", direction);
-    if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mut mgr = manager
-            .lock()
-            .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
-            .expect("预加载管理器锁不应该中毒");
+    if let Some(mut mgr) = preload_manager() {
         let mut strategy = mgr.strategy().clone();
         strategy.direction = direction;
         mgr.set_strategy(strategy);
@@ -325,16 +429,9 @@ pub fn set_reading_direction(direction: ReadingDirection) {
 /// 获取当前阅读方向
 #[frb(sync)]
 pub fn get_reading_direction() -> ReadingDirection {
-    if let Some(manager) = PRELOAD_MANAGER.get() {
-        manager
-            .lock()
-            .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
-            .expect("预加载管理器锁不应该中毒")
-            .strategy()
-            .direction
-    } else {
-        ReadingDirection::LeftToRight
-    }
+    preload_manager()
+        .map(|mgr| mgr.strategy().direction)
+        .unwrap_or(ReadingDirection::LeftToRight)
 }
 
 /// 计算需要预加载的页面
@@ -365,11 +462,7 @@ pub fn calculate_smart_preload_pages(
     total_pages: usize,
     reading_speed_ms: u64,
 ) -> Vec<usize> {
-    if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mgr = manager
-            .lock()
-            .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
-            .expect("预加载管理器锁不应该中毒");
+    if let Some(mgr) = preload_manager() {
         mgr.strategy()
             .calculate_smart_pages(current_page, total_pages, reading_speed_ms)
     } else {
@@ -386,11 +479,7 @@ pub fn calculate_smart_preload_pages(
 /// * `enable_smart` - 是否启用智能预取
 #[frb(sync)]
 pub fn set_preload_strategy(base_count: i32, max_count: i32, enable_smart: bool) {
-    if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mut mgr = manager
-            .lock()
-            .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
-            .expect("预加载管理器锁不应该中毒");
+    if let Some(mut mgr) = preload_manager() {
         let mut strategy = mgr.strategy().clone();
         strategy.base_preload_count = base_count as usize;
         strategy.max_preload_count = max_count as usize;
@@ -412,11 +501,7 @@ pub fn set_preload_strategy(base_count: i32, max_count: i32, enable_smart: bool)
 /// * `total_pages` - 总页数
 #[frb(sync)]
 pub fn get_next_page(current_page: usize, total_pages: usize) -> Option<usize> {
-    if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mgr = manager
-            .lock()
-            .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
-            .expect("预加载管理器锁不应该中毒");
+    if let Some(mgr) = preload_manager() {
         mgr.strategy().next_page(current_page, total_pages)
     } else {
         let strategy = PreloadStrategy::default();
@@ -431,11 +516,7 @@ pub fn get_next_page(current_page: usize, total_pages: usize) -> Option<usize> {
 /// * `total_pages` - 总页数
 #[frb(sync)]
 pub fn get_prev_page(current_page: usize, total_pages: usize) -> Option<usize> {
-    if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mgr = manager
-            .lock()
-            .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
-            .expect("预加载管理器锁不应该中毒");
+    if let Some(mgr) = preload_manager() {
         mgr.strategy().prev_page(current_page, total_pages)
     } else {
         let strategy = PreloadStrategy::default();
@@ -447,11 +528,7 @@ pub fn get_prev_page(current_page: usize, total_pages: usize) -> Option<usize> {
 #[frb(sync)]
 pub fn cancel_all_preload_tasks() {
     log::info!("取消所有预加载任务");
-    if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mut mgr = manager
-            .lock()
-            .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
-            .expect("预加载管理器锁不应该中毒");
+    if let Some(mut mgr) = preload_manager() {
         mgr.cancel_all();
     }
 }
@@ -463,11 +540,7 @@ pub fn cancel_all_preload_tasks() {
 #[frb(sync)]
 pub fn cancel_preload_tasks_for_file(file_path: String) {
     log::info!("取消文件预加载任务：{}", file_path);
-    if let Some(manager) = PRELOAD_MANAGER.get() {
-        let mut mgr = manager
-            .lock()
-            .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
-            .expect("预加载管理器锁不应该中毒");
+    if let Some(mut mgr) = preload_manager() {
         mgr.cancel_for_file(&file_path);
     }
 }
@@ -475,15 +548,9 @@ pub fn cancel_preload_tasks_for_file(file_path: String) {
 /// 获取待处理预加载任务数量
 #[frb(sync)]
 pub fn get_pending_preload_tasks() -> usize {
-    if let Some(manager) = PRELOAD_MANAGER.get() {
-        manager
-            .lock()
-            .map_err(|e| ComicError::Internal(format!("预加载管理器锁中毒：{}", e)))
-            .expect("预加载管理器锁不应该中毒")
-            .pending_count()
-    } else {
-        0
-    }
+    preload_manager()
+        .map(|mgr| mgr.pending_count())
+        .unwrap_or(0)
 }
 
 /// 提取漫画元数据
@@ -578,6 +645,19 @@ mod tests {
 
         assert_eq!(extract_page_image_encoded(&path, 0).unwrap(), jpeg);
         assert_eq!(extract_page_image_encoded(&path, 1).unwrap(), png);
+    }
+
+    #[test]
+    fn reads_stable_page_geometry_without_pixel_decode() {
+        let jpeg = encode(ImageOutputFormat::Jpeg(90));
+        let png = encode(ImageOutputFormat::Png);
+        let comic = create_cbz(&[("002.png", &png), ("001.jpg", &jpeg)]);
+
+        let dimensions = extract_comic_page_dimensions(&comic.path().to_string_lossy()).unwrap();
+
+        assert_eq!(dimensions.len(), 2);
+        assert_eq!((dimensions[0].width, dimensions[0].height), (2, 1));
+        assert_eq!((dimensions[1].width, dimensions[1].height), (2, 1));
     }
 
     #[test]

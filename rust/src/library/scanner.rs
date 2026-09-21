@@ -175,22 +175,28 @@ impl LibraryScanner {
 
     /// 增量扫描 (只扫描新文件)
     pub fn scan_incremental(&self, db: &LibraryDatabase) -> Result<Vec<LibraryEntry>> {
-        let mut changed_entries = Vec::new();
+        let mut paths = Vec::new();
         for scan_path in &self.scan_paths {
-            let mut paths = Vec::new();
             self.discover_files(scan_path, &mut paths)?;
-            for path in paths {
-                let normalized = normalize_path(&path);
-                let metadata = fs::metadata(&path)?;
-                let modified_at = file_modified_at(&metadata);
-                let unchanged =
-                    db.get_file_fingerprint(&normalized)?
-                        .is_some_and(|(size, modified)| {
-                            size == metadata.len() && modified == modified_at
-                        });
-                if !unchanged {
-                    changed_entries.push(self.create_library_entry(&path)?);
-                }
+        }
+        self.scan_incremental_paths(db, paths)
+    }
+
+    fn scan_incremental_paths(
+        &self,
+        db: &LibraryDatabase,
+        paths: Vec<PathBuf>,
+    ) -> Result<Vec<LibraryEntry>> {
+        let mut changed_entries = Vec::new();
+        for path in paths {
+            let normalized = normalize_path(&path);
+            let metadata = fs::metadata(&path)?;
+            let modified_at = file_modified_at(&metadata);
+            let unchanged = db
+                .get_file_fingerprint(&normalized)?
+                .is_some_and(|(size, modified)| size == metadata.len() && modified == modified_at);
+            if !unchanged {
+                changed_entries.push(self.create_library_entry(&path)?);
             }
         }
         Ok(changed_entries)
@@ -275,15 +281,15 @@ pub fn scan_and_update_library(db: &LibraryDatabase, scan_paths: &[String]) -> R
         scanner.add_scan_path(path);
     }
 
-    // Validate every configured root before touching the database. A revoked
+    // Discover every configured root before touching the database. A revoked
     // all-files grant or missing directory must preserve the previous shelf;
     // reconciliation is only safe after all roots were read successfully.
+    let mut discovered = Vec::new();
     for path in scan_paths {
         let root = Path::new(path);
         if !root.is_dir() {
             return Err(ComicError::FileNotFound(path.clone()));
         }
-        let mut discovered = Vec::new();
         scanner.discover_files(root, &mut discovered)?;
     }
 
@@ -292,7 +298,7 @@ pub fn scan_and_update_library(db: &LibraryDatabase, scan_paths: &[String]) -> R
     log::info!("清理了 {} 个不存在的文件", removed.len());
 
     // 增量扫描新文件
-    let new_entries = scanner.scan_incremental(db)?;
+    let new_entries = scanner.scan_incremental_paths(db, discovered)?;
     let new_count = new_entries.len();
 
     for entry in &new_entries {

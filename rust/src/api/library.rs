@@ -1,10 +1,8 @@
 //! 图书馆扫描、查询与管理接口。
 
-
-
-use flutter_rust_bridge::frb;
 use crate::error::{ComicError, Result};
 use crate::library_db::{get_global_db, LibraryEntry};
+use flutter_rust_bridge::frb;
 
 /// 扫描目录添加到图书馆
 ///
@@ -115,8 +113,8 @@ pub fn update_last_opened(file_path: String) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::init::init_app;
     use super::*;
+    use crate::api::init::init_app;
 
     #[test]
     fn test_library_operations() {
@@ -129,4 +127,3 @@ mod tests {
         assert!(results.is_empty());
     }
 }
-

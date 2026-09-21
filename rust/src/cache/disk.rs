@@ -109,8 +109,12 @@ impl DiskCache {
             access_order: Vec::new(),
         };
 
-        // 加载现有缓存元数据
-        cache.load_metadata()?;
+        // 加载现有缓存元数据。A truncated or stale metadata file must not make
+        // the cache unusable — the payload files are rebuildable, so keep
+        // whatever parsed cleanly instead of failing construction.
+        if let Err(error) = cache.load_metadata() {
+            log::warn!("磁盘缓存元数据加载失败，跳过：{}", error);
+        }
 
         Ok(cache)
     }
@@ -233,7 +237,12 @@ impl DiskCache {
     /// 清空缓存
     pub fn clear(&mut self) -> Result<()> {
         // 删除所有缓存文件
-        for entry in fs::read_dir(&self.cache_dir).ok().into_iter().flatten().flatten() {
+        for entry in fs::read_dir(&self.cache_dir)
+            .ok()
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("cache") {
                 fs::remove_file(&path).ok();
@@ -345,7 +354,12 @@ impl DiskCache {
 
                 // 删除文件
                 // 需要从 key 重建 PageKey (简化处理：直接删除所有匹配的文件)
-                for entry in fs::read_dir(&self.cache_dir).ok().into_iter().flatten().flatten() {
+                for entry in fs::read_dir(&self.cache_dir)
+                    .ok()
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                {
                     let path = entry.path();
                     if path
                         .file_name()
@@ -438,9 +452,10 @@ impl DiskCache {
             reader.read_exact(&mut last_access)?;
             let last_access = u64::from_le_bytes(last_access);
 
-            let mut size = [0u8; 8];
+            // Must match `save_metadata`, which writes the size as a u32.
+            let mut size = [0u8; 4];
             reader.read_exact(&mut size)?;
-            let size = u64::from_le_bytes(size) as usize;
+            let size = u32::from_le_bytes(size) as usize;
 
             let mut width = [0u8; 4];
             reader.read_exact(&mut width)?;
@@ -696,6 +711,26 @@ mod tests {
     }
 
     #[test]
+    fn metadata_survives_reload() {
+        let cache_dir = TestCacheDir::new();
+        let key = PageKey::new("test.cbz", 0);
+        let data = create_test_image();
+
+        {
+            let mut cache = DiskCache::new(cache_dir.config(10)).unwrap();
+            cache.insert(key.clone(), &data).unwrap();
+            cache.save_metadata().unwrap();
+        }
+
+        // A fresh instance must parse the file the writer produced; a field
+        // width mismatch here used to drop every entry on the next launch.
+        let reloaded = DiskCache::new(cache_dir.config(10)).unwrap();
+
+        assert!(reloaded.contains(&key));
+        assert_eq!(reloaded.current_size(), 16 + data.data.len());
+    }
+
+    #[test]
     fn test_hash_string_consistency() {
         let hash1 = hash_string("test.cbz");
         let hash2 = hash_string("test.cbz");
@@ -705,4 +740,3 @@ mod tests {
         assert_ne!(hash1, hash3);
     }
 }
-

@@ -136,7 +136,6 @@ mod tests {
         assert_eq!(sorted, vec!["page_1.png", "page_2.png", "page_10.png"]);
     }
 
-
     #[test]
     fn test_filter_image_files() {
         let files = vec![
@@ -152,7 +151,4 @@ mod tests {
         assert!(filtered.contains(&"002.jpg".to_string()));
         assert!(filtered.contains(&"003.jpeg".to_string()));
     }
-
-
 }
-

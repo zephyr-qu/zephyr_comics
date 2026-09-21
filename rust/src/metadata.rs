@@ -91,64 +91,46 @@ pub fn extract_metadata(file_path: &str) -> Result<ComicMetadata> {
 
 /// 从 ComicInfo.xml 提取元数据
 pub fn extract_from_comic_info(file_path: &str) -> Result<ComicMetadata> {
-    use std::fs::File;
-    use zip::ZipArchive;
-
-    let file = File::open(file_path)?;
-    let mut archive = ZipArchive::new(file)?;
-
-    // ComicInfo.xml is commonly nested beside the image folder, and its
-    // casing depends on the tool that created the archive.
-    let mut xml_data = None;
-    for index in 0..archive.len() {
-        let mut entry = archive.by_index(index)?;
-        let file_name = entry.name().rsplit('/').next().unwrap_or(entry.name());
-        if entry.is_file() && file_name.eq_ignore_ascii_case("ComicInfo.xml") {
-            let mut contents = String::new();
-            std::io::Read::read_to_string(&mut entry, &mut contents)?;
-            xml_data = Some(contents);
-            break;
-        }
-    }
-
-    let xml_data =
-        xml_data.ok_or_else(|| ComicError::FileNotFound("ComicInfo.xml not found".to_string()))?;
-
-    parse_comic_info_xml(&xml_data)
+    parse_comic_info_xml(&read_comic_info_xml(file_path)?)
 }
 
 /// Read the optional ComicInfo.xml FrontCover value without making it part of
 /// the public metadata/FRB shape. The value is an archive entry path and is
 /// resolved by the library scanner against the naturally sorted image list.
 pub fn extract_front_cover(file_path: &str) -> Result<Option<String>> {
-    use std::fs::File;
-    use zip::ZipArchive;
+    let contents = match read_comic_info_xml(file_path) {
+        Ok(contents) => contents,
+        Err(ComicError::FileNotFound(_)) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let lower = contents.to_ascii_lowercase();
+    let Some(open_start) = lower.find("<frontcover") else {
+        return Ok(None);
+    };
+    let Some(open_end_rel) = lower[open_start..].find('>') else {
+        return Ok(None);
+    };
+    let value_start = open_start + open_end_rel + 1;
+    let Some(close_rel) = lower[value_start..].find("</frontcover>") else {
+        return Ok(None);
+    };
+    let value = contents[value_start..value_start + close_rel].trim();
+    Ok((!value.is_empty()).then(|| value.to_string()))
+}
 
-    let file = File::open(file_path)?;
-    let mut archive = ZipArchive::new(file)?;
-    for index in 0..archive.len() {
-        let mut entry = archive.by_index(index)?;
-        let file_name = entry.name().rsplit('/').next().unwrap_or(entry.name());
-        if !entry.is_file() || !file_name.eq_ignore_ascii_case("ComicInfo.xml") {
-            continue;
+fn read_comic_info_xml(file_path: &str) -> Result<String> {
+    for entry_name in crate::archive_cache::list_files_from_cache(file_path)? {
+        let file_name = entry_name.rsplit('/').next().unwrap_or(&entry_name);
+        if file_name.eq_ignore_ascii_case("ComicInfo.xml") {
+            let bytes = crate::archive_cache::extract_file_from_cache(file_path, &entry_name)?;
+            return String::from_utf8(bytes).map_err(|error| {
+                ComicError::Internal(format!("ComicInfo.xml 编码错误：{}", error))
+            });
         }
-        let mut contents = String::new();
-        std::io::Read::read_to_string(&mut entry, &mut contents)?;
-        let lower = contents.to_ascii_lowercase();
-        let Some(open_start) = lower.find("<frontcover") else {
-            return Ok(None);
-        };
-        let Some(open_end_rel) = lower[open_start..].find('>') else {
-            return Ok(None);
-        };
-        let value_start = open_start + open_end_rel + 1;
-        let Some(close_rel) = lower[value_start..].find("</frontcover>") else {
-            return Ok(None);
-        };
-        let value = contents[value_start..value_start + close_rel].trim();
-        return Ok((!value.is_empty()).then(|| value.to_string()));
     }
-    Ok(None)
+    Err(ComicError::FileNotFound(
+        "ComicInfo.xml not found".to_string(),
+    ))
 }
 
 /// 解析 ComicInfo.xml 内容

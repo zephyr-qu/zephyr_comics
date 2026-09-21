@@ -43,9 +43,19 @@ impl LibraryDatabase {
         Ok(db)
     }
 
+    /// Lock the connection, recovering from a poisoned mutex instead of
+    /// panicking. A panic in one query must not make every later call panic:
+    /// SQLite's connection stays usable, so the guard is recovered in place.
+    fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.conn.lock().unwrap_or_else(|error| {
+            log::error!("数据库连接锁中毒，继续使用连接：{}", error);
+            error.into_inner()
+        })
+    }
+
     /// 初始化数据库表
     fn init_tables(&self) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS reading_progress (
@@ -145,7 +155,7 @@ impl LibraryDatabase {
 
     /// 保存阅读进度
     pub fn save_reading_progress(&self, progress: &ReadingProgress) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT OR REPLACE INTO reading_progress 
@@ -166,7 +176,7 @@ impl LibraryDatabase {
 
     /// 获取阅读进度
     pub fn get_reading_progress(&self, file_path: &str) -> Result<Option<ReadingProgress>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT file_path, chapter_index, page_index, last_read_timestamp, completion_percent
@@ -191,7 +201,7 @@ impl LibraryDatabase {
 
     /// 获取阅读历史
     pub fn get_reading_history(&self, limit: usize) -> Result<Vec<ReadingProgress>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn.prepare(
             "SELECT file_path, chapter_index, page_index, last_read_timestamp, completion_percent
@@ -222,7 +232,7 @@ impl LibraryDatabase {
 
     /// Hide a history entry while preserving progress and bookmarks.
     pub fn hide_reading_history(&self, file_path: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute(
             "UPDATE reading_progress SET history_visible = 0 WHERE file_path = ?1",
             params![file_path],
@@ -233,7 +243,7 @@ impl LibraryDatabase {
 
     /// 删除阅读进度
     pub fn remove_reading_progress(&self, file_path: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "DELETE FROM reading_progress WHERE file_path = ?1",
@@ -246,7 +256,7 @@ impl LibraryDatabase {
 
     /// 添加书签
     pub fn add_bookmark(&self, bookmark: &Bookmark) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "INSERT OR REPLACE INTO bookmarks (file_path, page_index, note, created_at)
@@ -265,7 +275,7 @@ impl LibraryDatabase {
 
     /// 移除书签
     pub fn remove_bookmark(&self, file_path: &str, page_index: usize) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "DELETE FROM bookmarks WHERE file_path = ?1 AND page_index = ?2",
@@ -278,7 +288,7 @@ impl LibraryDatabase {
 
     /// 获取书签列表
     pub fn get_bookmarks(&self, file_path: &str) -> Result<Vec<Bookmark>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn
             .prepare(
@@ -308,7 +318,7 @@ impl LibraryDatabase {
 
     /// 获取所有书签
     pub fn get_all_bookmarks(&self) -> Result<Vec<Bookmark>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn
             .prepare(
@@ -338,7 +348,7 @@ impl LibraryDatabase {
 
     /// 获取阅读统计
     pub fn get_reading_stats(&self) -> Result<ReadingStats> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let total_comics: usize = conn
             .query_row(
@@ -366,7 +376,7 @@ impl LibraryDatabase {
 
     /// 添加漫画到库
     pub fn add_to_library(&self, entry: &LibraryEntry) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let modified_at = std::fs::metadata(&entry.file_path)
             .ok()
             .and_then(|metadata| metadata.modified().ok())
@@ -417,7 +427,7 @@ impl LibraryDatabase {
     /// This remains an implementation seam and is intentionally not exposed
     /// through the generated Flutter `LibraryEntry` shape.
     pub fn get_file_fingerprint(&self, file_path: &str) -> Result<Option<(u64, u64)>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.query_row(
             "SELECT file_size, modified_at FROM library WHERE file_path = ?1",
             params![file_path],
@@ -429,7 +439,7 @@ impl LibraryDatabase {
 
     /// 从库中移除
     pub fn remove_from_library(&self, file_path: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         conn.execute(
             "DELETE FROM library WHERE file_path = ?1",
@@ -442,7 +452,7 @@ impl LibraryDatabase {
 
     /// 获取库中所有漫画
     pub fn get_library_entries(&self) -> Result<Vec<LibraryEntry>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn
             .prepare(
@@ -486,7 +496,7 @@ impl LibraryDatabase {
 
     /// 搜索漫画
     pub fn search_library(&self, query: &str) -> Result<Vec<LibraryEntry>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let search_pattern = format!("%{}%", query);
 
         let mut stmt = conn
@@ -533,7 +543,7 @@ impl LibraryDatabase {
 
     /// 获取最近添加的漫画
     pub fn get_recently_added(&self, limit: usize) -> Result<Vec<LibraryEntry>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let mut stmt = conn
             .prepare(
@@ -577,7 +587,7 @@ impl LibraryDatabase {
 
     /// 更新最后打开时间
     pub fn update_last_opened(&self, file_path: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let now = current_timestamp();
 
         conn.execute(
