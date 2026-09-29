@@ -2,12 +2,12 @@
 status: accepted
 ---
 
-# Use direct filesystem access for the personal Android MVP
+# 个人 Android MVP 采用直接文件系统访问
 
-Zephyr Comics targets a personally sideloaded Android 11+ application and reads one user-selected Library Root through Android's all-files access permission. We rejected a parallel SAF flow because Rust needs stable paths and copying 200–500 MB archives into application cache adds latency, storage duplication, and a second file-access implementation; if permission is denied, the MVP asks the user to authorize again instead of silently switching access models.
+Zephyr Comics 面向个人侧载（sideload）的 Android 11+ 应用，通过 Android 的"所有文件访问"权限读取用户选定的唯一漫画根目录。我们否决了与之并行的 SAF 流程，因为 Rust 需要稳定的路径，而把 200–500 MB 的压缩包复制进应用缓存会带来延迟、存储重复，以及第二套文件访问实现；如果权限被拒绝，MVP 会要求用户重新授权，而不是悄悄切换访问模型。
 
-## Consequences
+## 后果（Consequences）
 
-The MVP is not designed for Google Play distribution. Comic source files remain read-only, and application code must never delete or rewrite them.
+MVP 不为 Google Play 分发而设计。漫画源文件保持只读，应用代码绝不删除或改写它们。
 
-The SAF-era scaffolding (SAF MethodChannel, copy-to-cache pipeline, path mappers, and the legacy READ/WRITE_EXTERNAL_STORAGE permissions) has been removed; the app exposes a single storage channel for all-files access only.
+SAF 时期的脚手架（SAF MethodChannel、复制到缓存的流水线、路径映射器，以及遗留的 READ/WRITE_EXTERNAL_STORAGE 权限）已被移除；应用只暴露一个用于"所有文件访问"的存储通道。

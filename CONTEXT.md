@@ -1,53 +1,53 @@
-# Zephyr Comics Domain
+# Zephyr Comics 领域语言
 
-Zephyr Comics is a personal, offline Android comic reader. This glossary defines the product language used by requirements, code, tests, and UI copy.
+Zephyr Comics 是一个个人自用的离线 Android 漫画阅读器。本术语表定义了需求、代码、测试与界面文案共同使用的产品语言。
 
-## Library
+## 书架（Library）
 
-**Comic**:
-A single local CBZ or ZIP archive represented as one item in the library.
-_Avoid_: Book, manga file, chapter
+**漫画（Comic）**：
+以单个本地 CBZ 或 ZIP 压缩包存在、在书架中作为一个条目出现的作品。
+_避免_：书、漫画文件、章节
 
-**Library Root**:
-The single user-selected filesystem directory whose descendants are scanned for comics.
-_Avoid_: Scan path, source folder, collection
+**漫画根目录（Library Root）**：
+用户选定的唯一文件系统目录，其下所有层级都会被扫描以发现漫画。
+_避免_：扫描路径、来源文件夹、收藏集
 
-**Library Entry**:
-A derived record for a comic containing its path, title, cover, page count, format, and reading summary. The comic file remains the source of truth.
-_Avoid_: Comic file, database book
+**书架条目（Library Entry）**：
+漫画的派生记录，包含路径、标题、封面、页数、格式与阅读摘要。漫画文件本身始终是唯一事实来源。
+_避免_：漫画文件、数据库图书
 
-**Derived Cover**:
-A rebuildable thumbnail selected from `ComicInfo.xml` front-cover metadata or the first naturally sorted page.
-_Avoid_: Original cover, cached comic
+**派生封面（Derived Cover）**：
+从 `ComicInfo.xml` 的封面元数据，或按自然排序的第一页中选取的可重建缩略图。
+_避免_：原始封面、缓存漫画
 
-## Reading
+## 阅读（Reading）
 
-**Page**:
-A supported JPEG, PNG, or WebP image entry in a comic after filtering and natural sorting.
-_Avoid_: Archive entry, chapter page
+**页面（Page）**：
+漫画中经过过滤与自然排序后、受支持的 JPEG、PNG 或 WebP 图片条目。
+_避免_：压缩包条目、章节页
 
-**Reading Progress**:
-The last current page recorded for a comic, independent from whether the comic is finished or appears in history.
-_Avoid_: History, bookmark
+**阅读进度（Reading Progress）**：
+为一本漫画记录的最后当前页，与该漫画是否已读完、是否出现在历史中无关。
+_避免_：历史、书签
 
-**Reading History Entry**:
-A recency record showing that a comic was opened for reading. Removing it does not remove reading progress or bookmarks.
-_Avoid_: Reading progress
+**阅读历史条目（Reading History Entry）**：
+表明某本漫画曾被打开阅读的最近记录。移除它不会移除阅读进度或书签。
+_避免_：阅读进度
 
-**Bookmark**:
-A saved page in one comic that can be revisited or removed.
-_Avoid_: Favorite, note
+**书签（Bookmark）**：
+保存在某本漫画中、可跳回或删除的页面。
+_避免_：收藏、笔记
 
-**Finished Comic**:
-A comic whose last page has become the current displayed page. Restarting from page one does not immediately clear this state.
-_Avoid_: Completed archive, read progress 100 percent
+**已读完的漫画（Finished Comic）**：
+最后一页成为当前显示页的漫画。从第一页重新开始阅读不会立即清除这一状态。
+_避免_：已完成的压缩包、阅读进度 100%
 
-**Reader Mode**:
-One of the five supported page-navigation layouts: single-page vertical, left-to-right, right-to-left, continuous, or webtoon.
-_Avoid_: Chapter mode, double-page mode
+**阅读模式（Reader Mode）**：
+五种受支持的翻页布局之一：单页、左开、右开、连续、条漫。
+_避免_：章节模式、双页模式
 
-## Storage
+## 存储（Storage）
 
-**Derived Cache**:
-Rebuildable application-owned data such as covers, thumbnails, and temporary decode artifacts. It never includes the user's source comic.
-_Avoid_: Library, comic backup
+**派生缓存（Derived Cache）**：
+封面、缩略图与临时解码产物等由应用拥有、可重建的数据。它绝不包含用户的源漫画。
+_避免_：书架、漫画备份

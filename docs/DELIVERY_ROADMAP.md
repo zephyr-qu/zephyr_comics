@@ -1,75 +1,75 @@
-# Zephyr Comics MVP Delivery Roadmap
+# Zephyr Comics MVP 交付路线图
 
-> This roadmap implements `PRODUCT_REQUIREMENTS_V2.md`.
+> 本路线图实现 `PRODUCT_REQUIREMENTS_V2.md`。
 
-> Status: every implementation gate below was completed on 2026-08-03. Device-only performance evidence remains a user acceptance step.
+> 状态：以下每个实现门禁已于 2026-08-03 完成。真机性能证据仍是用户验收步骤。
 >
-> Traceability: each phase was originally delivered as a separate tracked work item. Those records are not part of the repository; use the git history for per-item detail.
+> 可追溯性：每个阶段最初都作为独立的工作项交付，那些记录不属于本仓库；若需要逐项细节，请查阅 git 历史。
 
-## Gate 0 — Existing Foundations
+## 门禁 0 —— 既有基础
 
-Existing shell, ReaderSession, real encoded-page path, library scan fixes, and continuous prefetch work are retained and audited. They are not treated as complete merely because code exists; each must be incorporated into a clean baseline with passing verification.
+既有的外壳、ReaderSession、真实的编码页路径、书架扫描修复与连续预取工作被保留并经过了审计。它们不会仅仅因为代码存在就被视为完成；每一项都必须并入一个通过验证的干净基线。
 
-## Phase 1 — Buildable Baseline
+## 阶段 1 —— 可构建基线
 
-- Audit the dirty worktree and existing task ownership.
-- Preserve and commit a coherent buildable baseline.
-- Set product identity and version policy.
-- Pin dependencies.
-- Add generated test CBZ fixtures.
-- Replace stale demo integration tests.
-- Add one local verification command.
-- Remove only proven-unused legacy paths.
-- Update README and mark old documents historical.
+- 审计脏工作树与既有的任务归属。
+- 保留并提交一个连贯、可构建的基线。
+- 确定产品标识与版本策略。
+- 固定依赖版本。
+- 增加生成的测试 CBZ fixture。
+- 替换过时的演示集成测试。
+- 增加一条本地验证命令。
+- 只移除已被证明无用的遗留路径。
+- 更新 README（当时还要求把旧文档标记为已被取代；那些文档此后已从仓库移除）。
 
-Exit gate: a clean checkout can run verification and build the current app without relying on hidden local state.
+退出条件：干净检出即可运行验证并构建当前应用，不依赖任何隐藏的本地状态。
 
-## Phase 2 — Trustworthy Library
+## 阶段 2 —— 可信书架
 
-- Direct filesystem access and permission recovery.
-- One Library Root and incremental refresh.
-- Accurate CBZ/ZIP format messaging.
-- Stable deduplication and missing-file reconciliation.
-- ComicInfo title/front-cover handling.
-- Aspect-preserving cover and deterministic placeholder.
-- Title search and three sort modes.
+- 直接文件系统访问与权限恢复。
+- 唯一漫画根目录与增量刷新。
+- 准确的 CBZ/ZIP 格式提示。
+- 稳定的去重与缺失文件核对。
+- ComicInfo 标题/封面处理。
+- 保持宽高比的封面与确定性占位图。
+- 标题搜索与三种排序方式。
 
-Exit gate: repeated startup/refresh operations produce a stable, truthful library without copying source archives.
+退出条件：反复启动/刷新会产生稳定、诚实的书架，且不复制源压缩包。
 
-## Phase 3 — Complete Reading Records
+## 阶段 3 —— 完整的阅读记录
 
-- Comic detail screen.
-- Real reading history.
-- Per-comic bookmarks.
-- Finished state and end-of-comic actions.
-- Progress reset and history deletion semantics.
-- Database schema version and migrations.
+- 漫画详情页。
+- 真实的阅读历史。
+- 每本漫画的书签。
+- 读完状态与漫画结束时的操作。
+- 进度重置与历史删除语义。
+- 数据库 schema 版本与迁移。
 
-Exit gate: every comic can be entered, resumed, restarted, bookmarked, finished, and found again through coherent product flows.
+退出条件：每本漫画都能被进入、继续、重来、加书签、读完，并能通过连贯的产品流程再次找到。
 
-## Phase 4 — Reader and Product Experience
+## 阶段 4 —— 阅读器与产品体验
 
-- Complete reader toolbar and Android back behavior.
-- Implement all approved user settings and defaults.
-- First-launch and permission states.
-- Unified Material 3 visual tokens and feedback states.
-- Honest empty/error/unsupported content messages.
-- Remove remaining placeholder screens and inconsistent copy.
+- 完整的阅读器工具栏与 Android 返回行为。
+- 实现所有已批准的用户设置与默认值。
+- 首次启动与权限状态。
+- 统一的 Material 3 视觉令牌与反馈状态。
+- 诚实的空/错误/不支持内容提示。
+- 移除剩余的占位页面与不一致文案。
 
-Exit gate: every route feels intentional, has loading/empty/error/content states, and contains no demo or misleading affordance.
+退出条件：每条路由都有意为之，具备加载/空/错误/内容状态，且不含演示性或误导性的可操作项。
 
-## Phase 5 — Performance and APK
+## 阶段 5 —— 性能与 APK
 
-- Profile/release first-page and continuous-reader measurements.
-- 100-page stability and memory check.
-- Database migration verification.
-- Offline/network-permission audit.
-- Full local verification.
-- Release APK build.
+- profile/release 下的首屏与连续阅读测量。
+- 100 页稳定性与内存检查。
+- 数据库迁移验证。
+- 离线/网络权限审计。
+- 完整本地验证。
+- release APK 构建。
 
-Exit gate: automated checks pass, release APK builds, and the user signs off on device-only performance evidence.
+退出条件：自动化检查通过、release APK 构建成功，并且用户对真机性能证据签字确认。
 
-## Dependency Order
+## 依赖顺序
 
 ```text
 Baseline
@@ -79,4 +79,4 @@ Baseline
                  -> Performance and APK
 ```
 
-Phases may research ahead, but implementation does not start out of order. Each phase is reviewed before its dependent phase begins.
+阶段可以提前做调研，但实现不会越序开始。每个阶段在其依赖阶段开始之前完成审查。

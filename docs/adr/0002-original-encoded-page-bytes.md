@@ -2,6 +2,6 @@
 status: accepted
 ---
 
-# Pass original encoded page bytes through the reader seam
+# 让原始编码页面字节穿过阅读器接缝
 
-The reader extracts the original JPEG, PNG, or WebP archive entry and passes those encoded bytes through `ReaderEngine` to Flutter, where decoding is constrained to the display size. We rejected a default Rust RGBA-to-PNG path and a required decoded-file cache because they duplicate decode and encode work, retain multiple large representations, and make first-page latency worse; compatibility functions may remain, but the product reader does not use them.
+阅读器取出压缩包中原始的 JPEG、PNG 或 WebP 条目，把这些编码字节通过 `ReaderEngine` 传给 Flutter，在 Flutter 中把解码约束到显示尺寸。我们否决了默认走"Rust 内 RGBA 转 PNG"的路径，也否决了强制要求一个已解码文件缓存的做法，因为它们会重复解码与编码工作、保留多份大体积表示，并让首屏延迟更糟；兼容函数可以保留，但产品阅读器不使用它们。

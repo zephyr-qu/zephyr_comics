@@ -1,194 +1,194 @@
-# Zephyr Comics Product Requirements V2
+# Zephyr Comics 产品需求 V2
 
-> Status: Authoritative MVP product requirements  
-> Product: Zephyr Comics  
-> Audience: one personal Android user  
-> Updated: 2026-08-03
+> 状态：权威 MVP 产品需求  
+> 产品：Zephyr Comics  
+> 受众：单一使用者（个人 Android 用户）  
+> 更新日期：2026-08-03
 
-## 1. Product Definition
+## 1. 产品定义
 
-Zephyr Comics is a private, offline Android application for organizing and reading local comics. The MVP optimizes for a small trustworthy surface: direct local access, a reliable library, smooth reading, durable progress, and a repeatable release build.
+Zephyr Comics 是一个私有、离线的 Android 应用，用于整理并阅读本地漫画。MVP 追求的是一小块可信的可用面：直接的本地访问、可靠的书架、流畅的阅读、持久的进度，以及可重复的发布构建。
 
-The application is complete only when it works as a daily reader without a development computer. A screen that renders under `flutter run` is not a finished product.
+只有当它能在没有开发电脑的情况下作为日常阅读器使用时，这个应用才算完成。一个只能在 `flutter run` 下渲染出来的界面不是成品。
 
-## 2. Platform and Distribution
+## 2. 平台与分发
 
-- Android only.
-- `minSdk 30` (Android 11), `targetSdk 35` (Android 15).
-- Permanent application ID: `com.zephyr.comics`.
-- Development versions use `0.1.x`; the completed MVP becomes `1.0.0`.
-- Final artifact: a release APK that can be installed locally. Store publishing and formal release-key operations are out of scope.
-- Simplified Chinese UI only.
+- 仅支持 Android。
+- `minSdk 30`（Android 11），`targetSdk 35`（Android 15）。
+- 固定应用 ID：`com.zephyr.comics`。
+- 开发版本使用 `0.1.x`；MVP 完成后成为 `1.0.0`。
+- 最终产物是可本地安装的 release APK。应用商店发布与正式签名密钥操作不在范围内。
+- 界面仅提供简体中文。
 
-## 3. Supported Content
+## 3. 支持的内容
 
-### Included
+### 包含
 
-- Archive formats: CBZ and ZIP.
-- Page image formats: JPEG, PNG, and WebP.
-- One archive is one comic and one continuous page sequence.
-- Images are discovered recursively, metadata and hidden system entries are ignored, and pages are naturally sorted by their full archive path.
+- 压缩包格式：CBZ 与 ZIP。
+- 页面图片格式：JPEG、PNG 与 WebP。
+- 一个压缩包即一本漫画，即一条连续的页面序列。
+- 图片被递归发现，元数据与隐藏的系统条目被忽略，页面按其在压缩包内的完整路径自然排序。
 
-### Deferred
+### 推迟
 
-- CBR/RAR, PDF, EPUB, AVIF, animated GIF, BMP, and TIFF.
-- Chapters, double-page spreads, automatic spread detection, and cross-device sync.
-- WebDAV, online sources, accounts, telemetry, update checks, and cloud backup.
+- CBR/RAR、PDF、EPUB、AVIF、动图 GIF、BMP 与 TIFF。
+- 章节、双页拼版、自动跨页识别与跨设备同步。
+- WebDAV、在线书源、账号、遥测、更新检查与云端备份。
 
-Unsupported content must be rejected honestly with a clear message. UI copy must not advertise deferred formats.
+不受支持的内容必须被诚实地拒绝并给出清晰提示。界面文案不得宣传已推迟的格式。
 
-## 4. File and Library Model
+## 4. 文件与书架模型
 
-- The user grants all-files access and selects one Library Root.
-- The application reads comics directly from their filesystem paths and never modifies, renames, moves, or deletes source files.
-- The Library Root is scanned recursively.
-- Startup performs a lightweight incremental refresh by normalized path, size, and modification time; pull-to-refresh triggers the same operation.
-- Unchanged files reuse stored metadata and Derived Covers.
-- A missing or unauthorized root preserves existing Library Entries and shows a recovery banner. Entries are reconciled only after access is restored and a scan succeeds.
-- There is no in-app “remove comic” or “delete source file” action. File management belongs to the Android file manager.
+- 用户授予"所有文件访问"权限，并选择一个漫画根目录。
+- 应用直接从文件系统路径读取漫画，绝不修改、重命名、移动或删除源文件。
+- 漫画根目录被递归扫描。
+- 启动时按规范化路径、文件大小与修改时间执行一次轻量增量刷新；下拉刷新触发同样的操作。
+- 未变化的文件复用已存储的元数据与派生封面。
+- 根目录缺失或未授权时，保留现有的书架条目并显示恢复提示条。只有在访问恢复且扫描成功之后，才会对条目做增删核对。
+- 应用内没有"移除漫画"或"删除源文件"操作。文件管理属于 Android 文件管理器。
 
-## 5. Library Experience
+## 5. 书架体验
 
-The library must provide:
+书架必须提供：
 
-- First-launch explanation and a single “选择漫画根目录” action.
-- A responsive cover grid with title, reading summary, and deterministic placeholder covers.
-- Search by title.
-- Sorting by recently read, recently added, or title.
-- Pull-to-refresh and visible scan/error states.
-- Stable deduplication across repeated refreshes.
+- 首次启动的说明，以及唯一的"选择漫画根目录"操作。
+- 响应式封面网格，包含标题、阅读摘要与确定性占位封面。
+- 按标题搜索。
+- 按最近阅读、最近加入或标题排序。
+- 下拉刷新，以及可见的扫描中/错误状态。
+- 反复刷新下稳定的去重。
 
-Cover selection uses a valid `ComicInfo.xml` `FrontCover` page first, otherwise the first naturally sorted page. Thumbnails preserve aspect ratio. Cover failure never removes the comic from the library.
+封面选取优先使用 `ComicInfo.xml` 中有效的 `FrontCover` 页面，否则使用自然排序的第一页。缩略图保持宽高比。封面失败绝不会把该漫画从书架中移除。
 
-## 6. Comic Detail
+## 6. 漫画详情
 
-Selecting a Library Entry opens a detail screen with:
+选择书架条目会打开详情页，其中包含：
 
-- Cover, title, archive format, page count, current progress, and finished state.
-- “继续阅读” and “从头阅读”.
-- Bookmarks for that comic, with jump and delete actions.
-- An explicit “重置阅读进度” action with confirmation.
+- 封面、标题、压缩包格式、页数、当前进度与读完状态。
+- "继续阅读"与"从头阅读"。
+- 该漫画的书签，可跳转与删除。
+- 带确认的显式"重置阅读进度"操作。
 
-Starting from page one does not immediately clear the finished state. Resetting progress is separate from removing history.
+从第一页开始阅读不会立即清除读完状态。重置进度与移除历史是两回事。
 
-## 7. Reading Experience
+## 7. 阅读体验
 
-### Reader Modes
+### 阅读模式
 
-The MVP supports exactly five modes:
+MVP 恰好支持五种模式：
 
-1. Single-page vertical.
-2. Left-to-right.
-3. Right-to-left.
-4. Continuous.
-5. Webtoon.
+1. 单页（单页竖直）。
+2. 左开（从左到右）。
+3. 右开（从右到左）。
+4. 连续。
+5. 条漫。
 
-Changing mode preserves the current page and ReaderSession.
+切换模式会保留当前页与 ReaderSession。
 
-### Reader Controls
+### 阅读器控件
 
-The reader toolbar includes:
+阅读器工具栏包含：
 
-- Back.
-- Comic title and current/total page count.
-- Page slider with direct jump.
-- Reader mode selection.
-- Add/remove bookmark for the current page.
-- Fullscreen toggle.
+- 返回。
+- 漫画标题与当前页/总页数。
+- 可直接跳转的页码滑块。
+- 阅读模式选择。
+- 为当前页添加/移除书签。
+- 全屏切换。
 
-The Android back action closes an open toolbar or overlay first; otherwise it saves progress and returns to comic detail.
+Android 返回操作先关闭已打开的工具栏或浮层；否则保存进度并返回漫画详情。
 
-### Completion and Failures
+### 完成与失败
 
-- The comic becomes finished when its final page becomes the current displayed page.
-- The end state offers “返回书架” and “从头阅读”; it does not auto-open another comic.
-- A corrupt or unsupported page produces a page-level error with retry and skip/navigation capability.
-- One bad page must not make the whole comic unreadable.
+- 当最后一页成为当前显示页时，该漫画变为已读完。
+- 结束状态提供"返回书架"与"从头阅读"；它不会自动打开下一本漫画。
+- 损坏或不受支持的页面产生页面级错误，并提供重试与跳过/导航能力。
+- 一个坏页不能让整本漫画变得不可读。
 
-## 8. Reading Records
+## 8. 阅读记录
 
-### Progress
+### 进度
 
-- Progress records the last current page per comic.
-- Closing the reader flushes the latest pending progress.
-- Reopening restores a valid clamped page.
+- 进度记录每本漫画的最后当前页。
+- 关闭阅读器会刷出最新的待写进度。
+- 重新打开会恢复一个经过截断的合法页码。
 
-### History
+### 历史
 
-- History is ordered by last reading time.
-- Each item shows cover, title, current/total pages, and time.
-- Selecting an item continues reading.
-- Removing a history entry does not remove progress or bookmarks.
+- 历史按最后阅读时间排序。
+- 每一项显示封面、标题、当前/总页数与时间。
+- 选择一项即继续阅读。
+- 移除历史条目不会移除进度或书签。
 
-### Bookmarks
+### 书签
 
-- The current page can be bookmarked or unbookmarked from the reader.
-- Detail shows bookmarks for that comic and supports jump/delete.
-- Notes, tags, favorites, and a global bookmark center are deferred.
+- 可在阅读器中为当前页添加或移除书签。
+- 详情页显示该漫画的书签，并支持跳转/删除。
+- 笔记、标签、收藏与全局书签中心均推迟。
 
-## 9. Settings
+## 9. 设置
 
-### Library
+### 书架
 
-- Library Root.
-- Refresh automatically on startup; default on.
+- 漫画根目录。
+- 启动时自动刷新；默认开启。
 
-### Reading
+### 阅读
 
-- Default Reader Mode; default single-page vertical.
-- Keep screen awake; default on.
-- Volume-key page turning; default off.
-- Show page number; default on.
-- Orientation: automatic, portrait, or landscape; default automatic.
+- 默认阅读模式；默认单页。
+- 阅读时保持屏幕常亮；默认开启。
+- 使用音量键翻页；默认关闭。
+- 显示页码；默认开启。
+- 屏幕方向：自动、竖屏或横屏；默认自动。
 
-### Appearance
+### 外观
 
-- Theme: system, light, or dark; default system.
-- Reader background: black or dark gray; default black.
+- 主题：跟随系统、浅色或深色；默认跟随系统。
+- 阅读页背景：纯黑或深灰；默认纯黑。
 
-### Storage
+### 存储
 
-- Display Derived Cache size.
-- Clear cover and thumbnail cache without touching source comics, progress, history, or bookmarks.
+- 显示派生缓存大小。
+- 清除封面与缩略图缓存，且不触碰源漫画、进度、历史与书签。
 
-### About
+### 关于
 
-- Product name and version.
-- Offline/privacy statement.
-- Open-source licenses.
+- 产品名称与版本。
+- 离线/隐私声明。
+- 开源许可证。
 
-Prefetch size, thread count, decode bounds, and memory limits are implementation policy and are not user settings.
+预取大小、线程数、解码尺寸上限与内存上限属于实现策略，不是用户设置。
 
-## 10. Privacy and Permissions
+## 10. 隐私与权限
 
-- The MVP is completely offline and requests no network permission.
-- It contains no analytics, telemetry, advertising SDK, update checker, or background upload.
-- The about page states that comic content, paths, and reading records are never uploaded.
-- If all-files access is denied, the app explains why it is required and offers authorization retry or exit. There is no SAF fallback in the MVP.
+- MVP 完全离线，不申请网络权限。
+- 它不包含任何分析、遥测、广告 SDK、更新检查或后台上传。
+- 关于页面说明：漫画内容、路径与阅读记录永远不会被上传。
+- 若"所有文件访问"被拒绝，应用会解释为何需要它，并提供重新授权或退出。MVP 没有 SAF 兜底方案。
 
-## 11. Quality Gates
+## 11. 质量门禁
 
-On the user's validation phone and a fixed large CBZ of roughly 500 MB / 200 pages:
+在用户用于验收的手机上，以及一个约 500 MB / 200 页的固定大 CBZ 上：
 
-- First visible page within 1.5 seconds in a profile or release build.
-- Normal continuous reading does not show loading inside the prepared page window.
-- Reading 100 consecutive pages does not crash and stays within a 300 MB memory target.
-- Closing and reopening restores the correct page.
-- A corrupt page remains a page-level failure.
+- profile 或 release 构建下，首个可见页面在 1.5 秒内出现。
+- 正常连续阅读时，在已准备好的页面窗口内不显示加载。
+- 连续阅读 100 页不崩溃，且内存保持在 300 MB 的目标以内。
+- 关闭并重新打开后恢复正确的页码。
+- 损坏页面仍然是页面级失败。
 
-Automated verification includes:
+自动化验证包含：
 
-- A small generated CBZ fixture containing sortable pages, metadata, an unsupported entry, and a corrupt-page variant.
-- Dart formatting check, Flutter static analysis, Flutter tests, Rust tests, and release APK build through one local command.
-- SQLite schema versioning and a migration test from the current schema. Database upgrades must not delete progress or bookmarks.
+- 一个生成的小型 CBZ fixture，含可排序页面、元数据、一个不受支持的条目与一个坏页变体。
+- Dart 格式检查、Flutter 静态分析、Flutter 测试、Rust 测试与 release APK 构建，通过一条本地命令完成。
+- SQLite schema 版本管理，以及从当前 schema 出发的迁移测试。数据库升级不得删除进度或书签。
 
-Device performance remains pending until the user runs the documented profile/release procedure and reports timing and memory evidence.
+在用户按文档执行 profile/release 流程并报告耗时与内存证据之前，真机性能仍属未完成。
 
-## 12. MVP Definition of Done
+## 12. MVP 完成定义
 
-- Every included user flow has an automated or explicit device acceptance check.
-- No screen is a placeholder.
-- UI copy matches actual format and feature support.
-- The repository has an understandable README, authoritative product/architecture documents, pinned dependencies, and a clean build baseline.
-- The local verification command passes except for a separately documented device-only performance gate.
-- A release APK builds successfully.
+- 每一条包含在内的用户流程都有自动化或明确的真机验收检查。
+- 没有任何页面是占位符。
+- 界面文案与实际格式和功能支持一致。
+- 仓库有可理解的 README、权威的产品/架构文档、固定版本的依赖，以及干净的构建基线。
+- 本地验证命令通过，唯一例外是单独记录的真机性能门禁。
+- release APK 构建成功。
