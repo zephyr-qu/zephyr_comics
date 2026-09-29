@@ -12,7 +12,7 @@ class ZephyrApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return SignalBuilder(
       builder: (context) {
-        final preference = settingsSnapshot.value.themePreference;
+        final preference = settings.themePreference.value;
         return MaterialApp.router(
           title: 'Zephyr Comics',
           debugShowCheckedModeBanner: false,

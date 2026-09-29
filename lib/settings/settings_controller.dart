@@ -85,6 +85,37 @@ final class SettingsController {
 
   ReadonlySignal<SettingsSnapshot> get snapshot => _snapshot;
 
+  /// Field-level views of [snapshot]. A listener that reads `.value` on one of
+  /// these is only notified when *that* field changes, where reading
+  /// `snapshot.value` notifies it on every settings write.
+  late final Computed<String> scanDirectoryPath = computed(
+    () => _snapshot.value.scanDirectoryPath,
+  );
+  late final Computed<ReaderMode> readerMode = computed(
+    () => _snapshot.value.readerMode,
+  );
+  late final Computed<ThemePreference> themePreference = computed(
+    () => _snapshot.value.themePreference,
+  );
+  late final Computed<bool> autoRefreshLibrary = computed(
+    () => _snapshot.value.autoRefreshLibrary,
+  );
+  late final Computed<bool> keepScreenAwake = computed(
+    () => _snapshot.value.keepScreenAwake,
+  );
+  late final Computed<bool> volumeKeyPaging = computed(
+    () => _snapshot.value.volumeKeyPaging,
+  );
+  late final Computed<bool> showPageNumber = computed(
+    () => _snapshot.value.showPageNumber,
+  );
+  late final Computed<OrientationPreference> orientationPreference = computed(
+    () => _snapshot.value.orientationPreference,
+  );
+  late final Computed<ReaderBackground> readerBackground = computed(
+    () => _snapshot.value.readerBackground,
+  );
+
   Future<void> load() async {
     final prefs = await _getStorage();
     final next = SettingsSnapshot(

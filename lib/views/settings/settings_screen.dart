@@ -37,14 +37,14 @@ class SettingsScreen extends StatelessWidget {
             const _ScanPathRow(),
             _SwitchRow(
               label: '启动时自动刷新',
-              read: () => settingsSnapshot.value.autoRefreshLibrary,
+              value: settings.autoRefreshLibrary,
               onChanged: setAutoRefreshLibrary,
             ),
             const _SectionHeader('阅读'),
             const _ReaderModeTile(),
             _SwitchRow(
               label: '显示页码',
-              read: () => settingsSnapshot.value.showPageNumber,
+              value: settings.showPageNumber,
               onChanged: setShowPageNumber,
             ),
             const _SectionHeader('外观'),
@@ -54,12 +54,12 @@ class SettingsScreen extends StatelessWidget {
             const _OrientationTile(),
             _SwitchRow(
               label: '阅读时保持屏幕常亮',
-              read: () => settingsSnapshot.value.keepScreenAwake,
+              value: settings.keepScreenAwake,
               onChanged: setKeepScreenAwake,
             ),
             _SwitchRow(
               label: '使用音量键翻页',
-              read: () => settingsSnapshot.value.volumeKeyPaging,
+              value: settings.volumeKeyPaging,
               onChanged: setVolumeKeyPaging,
             ),
             const _SectionHeader('存储'),
@@ -235,12 +235,14 @@ class _ZephyrSwitch extends StatelessWidget {
 class _SwitchRow extends StatelessWidget {
   const _SwitchRow({
     required this.label,
-    required this.read,
+    required this.value,
     required this.onChanged,
   });
 
   final String label;
-  final bool Function() read;
+
+  /// A field-level signal, so flipping one switch does not rebuild every row.
+  final ReadonlySignal<bool> value;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -249,7 +251,7 @@ class _SwitchRow extends StatelessWidget {
       label: label,
       trailing: _ZephyrSwitch(
         key: Key('settings-switch-$label'),
-        value: read(),
+        value: value.value,
         onChanged: onChanged,
       ),
     ),
@@ -264,7 +266,7 @@ class _ScanPathRow extends StatelessWidget {
     final theme = Theme.of(context);
     return SignalBuilder(
       builder: (context) {
-        final path = settingsSnapshot.value.scanDirectoryPath;
+        final path = settings.scanDirectoryPath.value;
         return _SetRow(
           label: '漫画目录',
           sub: path.isEmpty ? '尚未设置' : path,
@@ -325,42 +327,72 @@ class _ChoiceRow<T> extends StatelessWidget {
               color: scheme.onSurface.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(ZephyrRadius.segmentCompact),
             ),
-            child: Row(
+            child: Stack(
               children: [
-                for (final (option, optionLabel) in options)
-                  Expanded(
-                    child: GestureDetector(
-                      key: Key('settings-$keyPrefix-${(option as Enum).name}'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => onChanged(option),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: ZephyrSpacing.sm,
-                        ),
+                // Equal-width segments, so `-1 .. 1` slides the brass selection
+                // exactly onto each one. Same motion as the reader drawer's
+                // pill, at this row's compact size.
+                Positioned.fill(
+                  child: AnimatedAlign(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    alignment: Alignment(
+                      -1 +
+                          2 *
+                              options
+                                  .indexWhere((option) => option.$1 == value)
+                                  .clamp(0, options.length - 1) /
+                              (options.length - 1),
+                      0,
+                    ),
+                    child: FractionallySizedBox(
+                      widthFactor: 1 / options.length,
+                      heightFactor: 1,
+                      child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: option == value ? scheme.primary : null,
+                          color: scheme.primary,
                           borderRadius: BorderRadius.circular(
                             ZephyrRadius.segmentCompact - 2,
-                          ),
-                        ),
-                        child: Text(
-                          optionLabel,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            fontSize: 11,
-                            fontWeight: option == value
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            color: option == value
-                                ? scheme.onPrimary
-                                : scheme.onSurfaceVariant,
                           ),
                         ),
                       ),
                     ),
                   ),
+                ),
+                Row(
+                  children: [
+                    for (final (option, optionLabel) in options)
+                      Expanded(
+                        child: GestureDetector(
+                          key: Key(
+                            'settings-$keyPrefix-${(option as Enum).name}',
+                          ),
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => onChanged(option),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: ZephyrSpacing.sm,
+                            ),
+                            child: Text(
+                              optionLabel,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                fontSize: 11,
+                                fontWeight: option == value
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                color: option == value
+                                    ? scheme.onPrimary
+                                    : scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -376,7 +408,7 @@ class _ReaderModeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SignalBuilder(
     builder: (context) {
-      final mode = settingsSnapshot.value.readerMode;
+      final mode = settings.readerMode.value;
       return _ChoiceRow<ReaderMode>(
         keyPrefix: 'reader-mode',
         label: '默认阅读模式',
@@ -396,7 +428,7 @@ class _ThemeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SignalBuilder(
     builder: (context) {
-      final preference = settingsSnapshot.value.themePreference;
+      final preference = settings.themePreference.value;
       return _ChoiceRow<ThemePreference>(
         keyPrefix: 'theme',
         label: '应用主题',
@@ -418,7 +450,7 @@ class _OrientationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SignalBuilder(
     builder: (context) {
-      final value = settingsSnapshot.value.orientationPreference;
+      final value = settings.orientationPreference.value;
       return _ChoiceRow<OrientationPreference>(
         keyPrefix: 'orientation',
         label: '屏幕方向',
@@ -440,7 +472,7 @@ class _BackgroundTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SignalBuilder(
     builder: (context) {
-      final value = settingsSnapshot.value.readerBackground;
+      final value = settings.readerBackground.value;
       return _ChoiceRow<ReaderBackground>(
         keyPrefix: 'reader-background',
         label: '阅读页背景',

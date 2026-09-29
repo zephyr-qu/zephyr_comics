@@ -24,7 +24,6 @@ final class Preferences implements SettingsStorage {
 
   static const scanPath = 'scanPath';
   static const readerMode = 'readerMode';
-  static const isDarkMode = 'isDarkMode';
   static const themePreference = 'themePreference';
   static const autoRefreshLibrary = 'autoRefreshLibrary';
   static const keepScreenAwake = 'keepScreenAwake';

@@ -61,6 +61,10 @@ class LibrarySnapshot {
 
 abstract interface class ComicLibraryAdapter {
   Future<List<ComicLibraryEntry>> scan(String rootPath);
+
+  /// Records that [path] was opened, so the shelf's recency ordering and its
+  /// "recently read" marker have data behind them.
+  Future<void> markOpened(String path);
 }
 
 /// Deterministic adapter for module and Widget tests. Production supplies the
@@ -71,6 +75,7 @@ class InMemoryComicLibraryAdapter implements ComicLibraryAdapter {
 
   List<ComicLibraryEntry> entries;
   Object? error;
+  final List<String> openedPaths = [];
 
   @override
   Future<List<ComicLibraryEntry>> scan(String rootPath) async {
@@ -78,6 +83,9 @@ class InMemoryComicLibraryAdapter implements ComicLibraryAdapter {
     if (failure != null) throw failure;
     return entries;
   }
+
+  @override
+  Future<void> markOpened(String path) async => openedPaths.add(path);
 }
 
 class ComicLibrary {
@@ -113,6 +121,16 @@ class ComicLibrary {
       );
     }
     return snapshot;
+  }
+
+  /// Best-effort: the shelf's recency marker is a projection of the database,
+  /// so a failed write must never affect the open that triggered it.
+  Future<void> markOpened(String path) async {
+    try {
+      await adapter.markOpened(path);
+    } catch (_) {
+      // Deliberately ignored — see the doc comment.
+    }
   }
 
   LibrarySnapshot search(String query) {

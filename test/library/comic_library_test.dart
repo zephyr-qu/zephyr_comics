@@ -101,4 +101,7 @@ class _QueuedComicLibraryAdapter implements ComicLibraryAdapter {
   @override
   Future<List<ComicLibraryEntry>> scan(String rootPath) =>
       requests.removeAt(0).future;
+
+  @override
+  Future<void> markOpened(String path) async {}
 }

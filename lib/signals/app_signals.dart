@@ -1,5 +1,6 @@
 import 'package:signals_flutter/signals_flutter.dart';
-import '../src/rust/api/library.dart' show scanDirectoryToLibrary;
+import '../src/rust/api/library.dart'
+    show scanDirectoryToLibrary, updateLastOpened;
 import '../library/comic_library.dart';
 import '../library/library_root_access.dart';
 import '../reading/reading_records.dart';
@@ -48,6 +49,11 @@ class _RustComicLibraryAdapter implements ComicLibraryAdapter {
           ),
         )
         .toList(growable: false);
+  }
+
+  @override
+  Future<void> markOpened(String path) async {
+    updateLastOpened(filePath: path);
   }
 }
 
@@ -104,12 +110,6 @@ void sortLibraryEntries(LibrarySort sort) {
 
 Future<void> setReaderMode(ReaderMode mode) async {
   await settings.setReaderMode(mode);
-}
-
-Future<void> setDarkMode(bool dark) async {
-  await settings.setThemePreference(
-    dark ? ThemePreference.dark : ThemePreference.light,
-  );
 }
 
 Future<void> setThemePreference(ThemePreference preference) async {

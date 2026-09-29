@@ -477,6 +477,34 @@ void main() {
     expect(find.text('返回书架'), findsOneWidget);
     expect(find.text('从头阅读'), findsOneWidget);
   });
+
+  testWidgets('the drawer clears the navigation bar when the chrome opens', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1.0;
+    // Opening the chrome restores the system bars, so the drawer has to sit
+    // above the navigation inset instead of under the gesture pill.
+    tester.view.viewPadding = const FakeViewPadding(bottom: 48);
+    tester.view.padding = const FakeViewPadding(bottom: 48);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_app(WidgetReaderEngine()));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('reader-toolbar-toggle')));
+    await tester.pump();
+    // Let the 320ms entrance settle so the translate is back to zero.
+    await tester.pump(const Duration(milliseconds: 400));
+
+    final drawerBottom = tester
+        .getBottomLeft(find.byKey(const Key('reader-toolbar')))
+        .dy;
+
+    // 600 tall, less the drawer's 14px inset and the 48px navigation inset.
+    expect(drawerBottom, closeTo(600 - 14 - 48, 0.5));
+  });
 }
 
 final class FakeReaderVolumeKeys implements ReaderVolumeKeys {

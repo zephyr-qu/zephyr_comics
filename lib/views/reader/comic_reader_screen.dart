@@ -80,9 +80,12 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
     _itemScrollController = ItemScrollController();
     _positionsListener = ItemPositionsListener.create()
       ..itemPositions.addListener(_onContinuousPosition);
-    _readerMode = settingsSnapshot.value.readerMode;
+    _readerMode = settings.readerMode.value;
     _enterFullscreen();
     _session.open();
+    // The shelf's recency order and "recently read" marker read the library
+    // row, so record the open here — best-effort, never blocking the reader.
+    unawaited(comicLibrary.markOpened(widget.filePath));
     _bookmarks = ReaderBookmarks(
       filePath: widget.filePath,
       records: widget.records ?? readingRecords,
@@ -152,7 +155,10 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
   Widget build(BuildContext context) {
     return SignalBuilder(
       builder: (context) {
-        final settings = settingsSnapshot.value;
+        // Read only the two fields the reader chrome depends on, so an
+        // unrelated settings write does not rebuild the live page stack.
+        final background = settings.readerBackground.value;
+        final showPageNumber = settings.showPageNumber.value;
         return ValueListenableBuilder<ReaderSnapshot>(
           valueListenable: _session.snapshot,
           builder: (context, snapshot, _) {
@@ -171,10 +177,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
                 autofocus: true,
                 onKeyEvent: _onKeyEvent,
                 child: Scaffold(
-                  backgroundColor: _backgroundColor(
-                    context,
-                    settings.readerBackground,
-                  ),
+                  backgroundColor: _backgroundColor(context, background),
                   body: switch (snapshot) {
                     ReaderOpening() => const Center(
                       child: CircularProgressIndicator(),
@@ -182,7 +185,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
                     ReaderFailed(:final failure) => _fatal(failure),
                     ReaderReady() => _ready(
                       snapshot,
-                      showPageNumber: settings.showPageNumber,
+                      showPageNumber: showPageNumber,
                     ),
                   },
                 ),
@@ -195,7 +198,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
   }
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent || !settingsSnapshot.value.volumeKeyPaging) {
+    if (event is! KeyDownEvent || !settings.volumeKeyPaging.value) {
       return KeyEventResult.ignored;
     }
     final ready = _readySnapshot;
@@ -211,7 +214,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
   }
 
   void _onVolumeKeyPressed(bool next) {
-    if (!mounted || !settingsSnapshot.value.volumeKeyPaging) return;
+    if (!mounted || !settings.volumeKeyPaging.value) return;
     final ready = _readySnapshot;
     if (ready == null) return;
     _goTo(ready.currentPage + (next ? 1 : -1), ready);
@@ -238,10 +241,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
 
   Widget _ready(ReaderReady ready, {required bool showPageNumber}) {
     final scheme = Theme.of(context).colorScheme;
-    _pageController ??= ExtendedPageController(
-      initialPage: ready.currentPage,
-      shouldIgnorePointerWhenScrolling: false,
-    );
+    _pageController ??= _newPageController(ready.currentPage);
     // The prototype's `done`: the last page replaces the drawer with a closing
     // card and retires the page-number handle.
     final finished = ready.currentPage + 1 >= ready.totalPages;
@@ -262,7 +262,10 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
                 layout: ready.layoutFor(index),
                 foreground: ready.currentPage == index || _isPageVisible(index),
               ),
-              separatorBuilder: (_, _) => const SizedBox.shrink(),
+              // 连续 keeps a 6px seam so its pages still read as discrete;
+              // 条漫 stitches them edge to edge as one strip.
+              separatorBuilder: (_, _) =>
+                  SizedBox(height: _readerMode == ReaderMode.webtoon ? 0 : 6),
             ),
           )
         else
@@ -465,38 +468,49 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
     });
   }
 
-  /// Page-turn and chrome-toggle zones. They stay live while the chrome is
-  /// showing, so a tap outside the drawer collapses it again; the chrome's own
-  /// surfaces absorb the taps that land on them.
-  Widget _gestureOverlay(ReaderReady ready) => IgnorePointer(
-    ignoring: _failedPages.contains(ready.currentPage),
-    child: Column(
-      children: [
-        Expanded(
-          flex: 2,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () => _goTo(ready.currentPage - 1, ready),
-          ),
-        ),
-        Expanded(
-          flex: 5,
-          child: GestureDetector(
-            key: const Key('reader-toolbar-toggle'),
-            behavior: HitTestBehavior.translucent,
-            onTap: _toggleChrome,
-          ),
-        ),
-        Expanded(
-          flex: 2,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () => _goTo(ready.currentPage + 1, ready),
-          ),
-        ),
-      ],
-    ),
-  );
+  /// Page-turn and chrome-toggle zones, laid out along the reading axis: the
+  /// vertical modes (`.sa-zones` for a vertical page) turn the page by tapping
+  /// above/below, the horizontal ones by tapping left/right. Right-opening
+  /// reads right to left, so its "next" tap sits on the left.
+  ///
+  /// They stay live while the chrome is showing, so a tap outside the drawer
+  /// collapses it again; the chrome's own surfaces absorb the taps that land on
+  /// them.
+  Widget _gestureOverlay(ReaderReady ready) {
+    final vertical = _continuous || _readerMode == ReaderMode.vertical;
+    final rightToLeft = _readerMode == ReaderMode.rtl;
+    final previous = GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => _goTo(ready.currentPage - 1, ready),
+    );
+    final next = GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => _goTo(ready.currentPage + 1, ready),
+    );
+    final toggle = GestureDetector(
+      key: const Key('reader-toolbar-toggle'),
+      behavior: HitTestBehavior.translucent,
+      onTap: _toggleChrome,
+    );
+    return IgnorePointer(
+      ignoring: _failedPages.contains(ready.currentPage),
+      child: vertical
+          ? Column(
+              children: [
+                Expanded(flex: 2, child: previous),
+                Expanded(flex: 5, child: toggle),
+                Expanded(flex: 2, child: next),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(flex: 2, child: rightToLeft ? next : previous),
+                Expanded(flex: 5, child: toggle),
+                Expanded(flex: 2, child: rightToLeft ? previous : next),
+              ],
+            ),
+    );
+  }
 
   /// Centre tap: reveal the chrome, or collapse it into the immersive state.
   void _toggleChrome() {
@@ -606,10 +620,13 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
   Widget _drawer(ReaderReady ready) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    // Opening the chrome restores the system bars (`_exitFullscreen`), so the
+    // drawer has to clear the navigation inset or the gesture pill lands on it.
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     return Positioned(
       left: 14,
       right: 14,
-      bottom: 14,
+      bottom: 14 + bottomInset,
       child: _Entrance(
         dy: 14,
         duration: const Duration(milliseconds: 320),
@@ -682,29 +699,25 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
                 ),
                 // Drawer rhythm — off the ladder.
                 const SizedBox(height: 9),
-                Slider(
-                  value: ready.currentPage.toDouble(),
-                  min: 0,
-                  max: (ready.totalPages - 1).toDouble(),
-                  divisions: ready.totalPages > 1 ? ready.totalPages - 1 : null,
-                  label: '第 ${ready.currentPage + 1} 页',
-                  onChanged: (value) => _goTo(value.round(), ready),
+                // A slimmer scrubber row than Material's 48px default; the
+                // `xxl` step keeps the drag target usable, where the
+                // prototype's 22px row would be too thin to grab on a phone.
+                SizedBox(
+                  height: ZephyrSpacing.xxl,
+                  child: Slider(
+                    value: ready.currentPage.toDouble(),
+                    min: 0,
+                    max: (ready.totalPages - 1).toDouble(),
+                    divisions: ready.totalPages > 1
+                        ? ready.totalPages - 1
+                        : null,
+                    label: '第 ${ready.currentPage + 1} 页',
+                    onChanged: (value) => _goTo(value.round(), ready),
+                  ),
                 ),
                 // Drawer rhythm — off the ladder.
                 const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.all(ZephyrSpacing.xs),
-                  decoration: BoxDecoration(
-                    color: scheme.onSurface.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(ZephyrRadius.segment),
-                  ),
-                  child: Row(
-                    children: [
-                      for (final mode in ReaderMode.values)
-                        Expanded(child: _modeSegment(mode, theme, scheme)),
-                    ],
-                  ),
-                ),
+                _modeSelector(theme, scheme),
                 // Drawer rhythm — off the ladder.
                 const SizedBox(height: 6),
                 SignalBuilder(
@@ -748,18 +761,60 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
     );
   }
 
+  /// The five reader modes. The brass selection is a single element that glides
+  /// between the segments, so switching reads as one control moving rather than
+  /// five backgrounds toggling.
+  Widget _modeSelector(ThemeData theme, ColorScheme scheme) {
+    const modes = ReaderMode.values;
+    final index = modes.indexOf(_readerMode);
+    return Container(
+      padding: const EdgeInsets.all(ZephyrSpacing.xs),
+      decoration: BoxDecoration(
+        color: scheme.onSurface.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(ZephyrRadius.segment),
+      ),
+      child: Stack(
+        children: [
+          // Equal-width segments, so `-1 .. 1` lands the pill exactly on each
+          // one without measuring anything.
+          Positioned.fill(
+            child: AnimatedAlign(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              alignment: Alignment(-1 + 2 * index / (modes.length - 1), 0),
+              child: FractionallySizedBox(
+                widthFactor: 1 / modes.length,
+                heightFactor: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: scheme.primary,
+                    borderRadius: BorderRadius.circular(
+                      ZephyrRadius.segment - 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              for (final mode in modes)
+                Expanded(child: _modeSegment(mode, theme, scheme)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _modeSegment(ReaderMode mode, ThemeData theme, ColorScheme scheme) {
     final selected = _readerMode == mode;
     return GestureDetector(
       key: Key('reader-mode-${mode.name}'),
       behavior: HitTestBehavior.opaque,
       onTap: () => _applyMode(mode),
-      child: Container(
+      child: Padding(
         padding: const EdgeInsets.symmetric(vertical: ZephyrSpacing.lg),
-        decoration: BoxDecoration(
-          color: selected ? scheme.primary : null,
-          borderRadius: BorderRadius.circular(ZephyrRadius.segment - 2),
-        ),
         child: Text(
           mode.label,
           textAlign: TextAlign.center,
@@ -891,11 +946,12 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
         behavior: HitTestBehavior.opaque,
         onTap: () {},
         child: Container(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
             ZephyrSpacing.xl,
             ZephyrSpacing.xxl,
             ZephyrSpacing.xl,
-            ZephyrSpacing.xl,
+            // Clear the restored navigation bar, exactly as the drawer does.
+            ZephyrSpacing.xl + MediaQuery.viewPaddingOf(context).bottom,
           ),
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -978,10 +1034,7 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
     if (mode == _readerMode) return;
     final currentPage = (_session.snapshot.value as ReaderReady).currentPage;
     final previousController = _pageController;
-    _pageController = ExtendedPageController(
-      initialPage: currentPage,
-      shouldIgnorePointerWhenScrolling: false,
-    );
+    _pageController = _newPageController(currentPage);
     setState(() {
       _readerMode = mode;
       _continuousScrollActive = false;
@@ -991,6 +1044,16 @@ class _ComicReaderScreenState extends State<ComicReaderScreen> {
       (_) => previousController?.dispose(),
     );
   }
+
+  /// A page controller carrying the gesture-arena choice in one place: letting
+  /// the page view win the gesture before the page image does is what makes the
+  /// drag follow the finger. With `false` the image's scale recognizer wins, and
+  /// at 1x it deliberately refuses to turn the page (`GestureDetails.movePage`
+  /// bails while `totalScale <= 1`).
+  ExtendedPageController _newPageController(int page) => ExtendedPageController(
+    initialPage: page,
+    shouldIgnorePointerWhenScrolling: true,
+  );
 
   Future<void> _toggleBookmark(int page) async {
     final result = await _bookmarks.toggle(page);

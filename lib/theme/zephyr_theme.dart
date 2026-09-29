@@ -354,9 +354,9 @@ ThemeData _theme(ColorScheme scheme, Brightness brightness) {
       inactiveTrackColor: scheme.onSurface.withValues(alpha: 0.2),
       thumbColor: scheme.primary,
       overlayColor: scheme.primary.withValues(alpha: 0.12),
-      // The prototype rotates an 11px square 45°: a diamond, not a disc.
+      // The prototype rotates a small square 45°: a diamond, not a disc.
       thumbShape: const _DiamondThumbShape(),
-      overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: scheme.primary,
@@ -428,13 +428,14 @@ ThemeData zephyrDarkTheme() => _theme(_darkScheme(), Brightness.dark);
 /// The derived light counterpart. See [_Light] for its provenance.
 ThemeData zephyrLightTheme() => _theme(_lightScheme(), Brightness.light);
 
-/// The prototype's scrubber thumb: an 11px square rotated 45°, so the reader
-/// slider reads as a diamond rather than Material's disc (`.sa-range`'s
-/// `transform: rotate(45deg)`).
+/// The prototype's scrubber thumb: a square rotated 45° (`.sa-range`'s
+/// `transform: rotate(45deg)`), so the reader slider reads as a diamond rather
+/// than Material's disc. One step slimmer than the prototype's 11px because the
+/// drawer row is deliberately compact.
 class _DiamondThumbShape extends SliderComponentShape {
   const _DiamondThumbShape();
 
-  static const double _side = 11;
+  static const double _side = 9;
 
   @override
   Size getPreferredSize(bool isEnabled, bool isDiscrete) =>
