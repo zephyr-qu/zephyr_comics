@@ -47,6 +47,8 @@ void main() {
       expect(controller.snapshot.value.readerMode, ReaderMode.rtl);
       expect(controller.snapshot.value.showPageNumber, isFalse);
       expect(controller.snapshot.value.autoRefreshLibrary, isTrue);
+      // The identity is the light palette, so light is the shipped default.
+      expect(controller.snapshot.value.themePreference, ThemePreference.light);
       expect(appliedOrientation, OrientationPreference.auto);
       expect(appliedAwake, isTrue);
       expect(appliedVolumePaging, isFalse);
@@ -68,4 +70,27 @@ void main() {
       expect(appliedVolumePaging, isTrue);
     },
   );
+
+  test('a stored theme preference still wins over the light default', () async {
+    final storage = MemorySettingsStorage({
+      Preferences.themePreference: 'dark',
+    });
+    final controller = SettingsController(
+      loadStorage: () async => storage,
+      // Stubbed like the test above: the real appliers talk to SystemChrome,
+      // which needs a binding this plain test does not have.
+      applyOrientation: (_) async {},
+      applyKeepScreenAwake: (_) async {},
+      applyVolumeKeyPaging: (_) async {},
+    );
+
+    await controller.load();
+
+    // Light is a default, not an override: the setting stays the user's.
+    expect(controller.snapshot.value.themePreference, ThemePreference.dark);
+
+    await controller.setThemePreference(ThemePreference.system);
+    await controller.load();
+    expect(controller.snapshot.value.themePreference, ThemePreference.system);
+  });
 }

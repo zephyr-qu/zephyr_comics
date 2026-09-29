@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The seal alone, for the paper launch window: the same geometry as
+     ic_launcher_foreground, in its own 108dp box so the layer-list can centre it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="1.125"
+        android:scaleY="1.125"
+        android:translateX="18"
+        android:translateY="18">
+        <path
+            android:pathData="M9 32a23 23 0 1 0 46 0a23 23 0 0 0-46 0Z"
+            android:fillColor="#7E6128" />
+        <path
+            android:pathData="M18 25L31 19.5L31 35L18 39.5Z"
+            android:fillColor="#F4EFE6" />
+        <path
+            android:pathData="M33 19.5L46 25L46 39.5L33 35Z"
+            android:fillColor="#F4EFE6" />
+    </group>
+</vector>

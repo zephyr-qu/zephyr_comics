@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The window background — the launch window and the frame behind Flutter — is
+     the identity's paper rather than the template's white, so opening a paper app
+     does not flash. values-night carries the same value, because the app's theme
+     preference defaults to light and is a Dart-side setting: a dark launch window
+     would flash before a paper app. -->
+<resources>
+    <color name="window_background">#F4EFE6</color>
+</resources>

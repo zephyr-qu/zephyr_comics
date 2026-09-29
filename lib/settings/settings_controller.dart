@@ -18,10 +18,13 @@ final class SettingsSnapshot {
     required this.readerBackground,
   });
 
+  /// The shipped defaults. The theme is [ThemePreference.light]: the identity is
+  /// the paper-and-brass light palette, so "follow the system" would put a dark
+  /// UI behind a paper launcher icon. Dark remains one tap away in settings.
   factory SettingsSnapshot.defaults() => const SettingsSnapshot(
     scanDirectoryPath: '',
     readerMode: ReaderMode.vertical,
-    themePreference: ThemePreference.system,
+    themePreference: ThemePreference.light,
     autoRefreshLibrary: true,
     keepScreenAwake: true,
     volumeKeyPaging: false,
@@ -126,7 +129,7 @@ final class SettingsController {
       themePreference: _enumValue(
         ThemePreference.values,
         prefs.getString(Preferences.themePreference),
-        ThemePreference.system,
+        ThemePreference.light,
       ),
       autoRefreshLibrary: prefs.getBool(Preferences.autoRefreshLibrary) ?? true,
       keepScreenAwake: prefs.getBool(Preferences.keepScreenAwake) ?? true,
