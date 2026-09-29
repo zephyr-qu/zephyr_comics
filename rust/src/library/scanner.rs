@@ -465,6 +465,29 @@ mod tests {
     }
 
     #[test]
+    fn scan_counts_only_supported_page_formats() {
+        let dir = unique_temp_dir("page-formats");
+        let path = dir.join("mixed.cbz");
+        write_cbz(
+            &path,
+            &[
+                ("001.png", b"not an image"),
+                ("002.jpg", b"not an image"),
+                ("003.webp", b"not an image"),
+                ("004.gif", b"not an image"),
+                ("005.bmp", b"not an image"),
+                ("006.txt", b"not an image"),
+                ("__MACOSX/007.png", b"not an image"),
+                (".hidden.png", b"not an image"),
+            ],
+        );
+        let entry = LibraryScanner::new().create_library_entry(&path).unwrap();
+        // GIF/BMP are deferred formats and hidden system entries never count, so
+        // only the three supported page images above are pages.
+        assert_eq!(entry.total_pages, 3);
+        let _ = fs::remove_dir_all(dir);
+    }
+    #[test]
     fn scan_incremental_reuses_unchanged_fingerprint() {
         let dir = unique_temp_dir("incremental");
         let path = dir.join("one.cbz");

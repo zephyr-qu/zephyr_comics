@@ -87,24 +87,41 @@ fn natural_cmp(a: &str, b: &str) -> Ordering {
     }
 }
 
-/// 过滤出图像文件
+/// 受支持的页面图片扩展名。
 ///
-/// 从文件列表中筛选出支持的图像格式。
-pub fn filter_image_files(files: &[String]) -> Vec<String> {
-    let image_extensions = ["jpg", "jpeg", "png", "gif", "webp", "bmp"];
+/// PRD 只承诺 JPEG、PNG 与 WebP。GIF 与 BMP 属于已推迟格式：解码器恰好能读它们，
+/// 并不等于产品支持它们，所以它们不是页面。
+const PAGE_IMAGE_EXTENSIONS: [&str; 4] = ["jpg", "jpeg", "png", "webp"];
 
+/// 是否为隐藏或系统资源条目。
+///
+/// 任一路径分量以 `.` 开头（含 macOS 的 `._` 资源分支），或分量名为 `__MACOSX`，
+/// 都不是页面。压缩包条目按规范以 `/` 分隔，这里同时容忍 `\`。
+fn is_hidden_entry(name: &str) -> bool {
+    name.split(['/', '\\'])
+        .any(|segment| segment.starts_with('.') || segment.eq_ignore_ascii_case("__MACOSX"))
+}
+
+/// 扩展名是否为受支持的页面图片格式。
+fn has_page_image_extension(name: &str) -> bool {
+    name.rsplit('.')
+        .next()
+        .map(|ext| {
+            PAGE_IMAGE_EXTENSIONS
+                .iter()
+                .any(|&ie| ie.eq_ignore_ascii_case(ext))
+        })
+        .unwrap_or(false)
+}
+
+/// 过滤出页面图片
+///
+/// 从压缩包条目列表中筛选出受支持的图像格式，并排除隐藏与系统资源条目。这是
+/// 「哪些条目算页面」的唯一判据，`cache::archive` 的页表直接用它。
+pub fn filter_image_files(files: &[String]) -> Vec<String> {
     files
         .iter()
-        .filter(|f| {
-            f.rsplit('.')
-                .next()
-                .map(|ext| {
-                    image_extensions
-                        .iter()
-                        .any(|&ie| ie.eq_ignore_ascii_case(ext))
-                })
-                .unwrap_or(false)
-        })
+        .filter(|f| !is_hidden_entry(f) && has_page_image_extension(f))
         .cloned()
         .collect()
 }
@@ -144,11 +161,27 @@ mod tests {
             "readme.txt".to_string(),
             "003.jpeg".to_string(),
             "notes.md".to_string(),
+            "004.webp".to_string(),
+            "005.gif".to_string(),
+            "006.bmp".to_string(),
+            "007.tiff".to_string(),
         ];
         let filtered = filter_image_files(&files);
-        assert_eq!(filtered.len(), 3);
-        assert!(filtered.contains(&"001.png".to_string()));
-        assert!(filtered.contains(&"002.jpg".to_string()));
-        assert!(filtered.contains(&"003.jpeg".to_string()));
+        assert_eq!(filtered, vec!["001.png", "002.jpg", "003.jpeg", "004.webp"]);
+    }
+
+    #[test]
+    fn test_filter_image_files_skips_hidden_and_system_entries() {
+        let files = vec![
+            "001.png".to_string(),
+            ".hidden.png".to_string(),
+            "._001.png".to_string(),
+            "nested/002.png".to_string(),
+            "nested/.hidden.png".to_string(),
+            "__MACOSX/nested/._002.png".to_string(),
+            "__macosx/003.png".to_string(),
+        ];
+        let filtered = filter_image_files(&files);
+        assert_eq!(filtered, vec!["001.png", "nested/002.png"]);
     }
 }
