@@ -12,7 +12,6 @@ The project is currently being completed toward a personal Android MVP. CBR, PDF
 - [Domain Language](CONTEXT.md)
 - [Architectural Decisions](docs/adr)
 
-
 ## Current Development State
 
 The personal Android MVP is feature-complete: every roadmap phase — baseline,
@@ -25,14 +24,9 @@ The implementation is locally buildable and committed; the gate below is the
 definition of green. At the last recorded run (`8ee4511`) it passed end to end
 with 105 Flutter tests and 47 Rust tests and rebuilt a 64.5 MB release APK.
 
-Two things stay explicitly open, and neither is a code gap:
-
-- Device-only performance and launch evidence has never been collected. It is
-  the user's acceptance step.
-- `tool/generate_fixtures.ps1` is not byte-reproducible: the fixture archives
-  are written in hashtable enumeration order, and `ZipArchive` stamps each
-  entry with the current time. A gate run therefore dirties three fixtures in
-  git even though their contents are stable.
+One thing stays explicitly open, and it is not a code gap: device-only
+performance and launch evidence has never been collected. It is the user's
+acceptance step.
 
 ## Development
 
@@ -55,8 +49,9 @@ Generate the copyright-free fixtures and run the complete local gate with:
 pwsh -NoProfile -File tool/verify_mvp.ps1
 ```
 
-The gate runs Dart format checking, Flutter analyze/tests, Rust tests, and a
-release APK build. The resulting APK is
+The gate runs Dart format checking, Flutter analyze/tests, Rust tests, clippy
+with warnings denied, and a release APK build. It regenerates the fixtures and
+the bridge bindings first, and leaves the worktree clean. The resulting APK is
 `build/app/outputs/flutter-apk/app-release.apk`.
 
 The Android launcher icons are generated from `brand/logo/icon.svg`; regenerate

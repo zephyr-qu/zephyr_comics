@@ -26,6 +26,9 @@
 //! ```
 
 pub mod api;
+// 由 flutter_rust_bridge 生成，不是本仓库的代码：任何来自它的 lint 都不应该
+// 让门禁变红（FRB 升级不应连带改动这里）。
+#[allow(clippy::all)]
 mod frb_generated;
 
 // 核心模块

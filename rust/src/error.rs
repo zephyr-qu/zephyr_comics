@@ -104,7 +104,7 @@ mod tests {
     #[test]
     fn test_result_alias() {
         let result: Result<String> = Ok("success".to_string());
-        assert_eq!(result.unwrap(), "success");
+        assert_eq!(result, Ok("success".to_string()));
 
         let result: Result<String> = Err(ComicError::FileNotFound("x".to_string()));
         assert!(result.is_err());

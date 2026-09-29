@@ -28,6 +28,10 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  # No cupertino_icons: the app uses Material 3 and never renders a CupertinoIcons
+  # glyph. Dropping it makes the Android release build print a known tree-shaker
+  # warning about the missing font family; Flutter ships that bug unfixed and it is
+  # harmless (flutter/flutter#119074). Do not re-add the package to silence it.
   flutter:
     sdk: flutter
   signals_flutter: ^7.1.0

@@ -5,10 +5,12 @@ New-Item -ItemType Directory -Force -Path $fixtureRoot | Out-Null
 
 $png = [Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=')
 
+# 固定时间戳：ZIP 格式能表达的最早时间。用当前时间会让每次生成产生不同的字节。
+$entryTimestamp = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
 function Write-ZipFixture {
   param(
     [Parameter(Mandatory)] [string] $Path,
-    [Parameter(Mandatory)] [hashtable] $Entries
+    [Parameter(Mandatory)] [System.Collections.IDictionary] $Entries
   )
 
   $absolutePath = Join-Path $fixtureRoot $Path
@@ -22,6 +24,7 @@ function Write-ZipFixture {
     try {
       foreach ($entry in $Entries.GetEnumerator()) {
         $zipEntry = $archive.CreateEntry($entry.Key)
+        $zipEntry.LastWriteTime = $entryTimestamp
         $entryStream = $zipEntry.Open()
         try { $entryStream.Write($entry.Value, 0, $entry.Value.Length) }
         finally { $entryStream.Dispose() }
@@ -42,20 +45,20 @@ $comicInfo = [Text.Encoding]::UTF8.GetBytes(@'
 $readme = [Text.Encoding]::UTF8.GetBytes('Generated test entry; no copyrighted content.')
 $corrupt = [Text.Encoding]::UTF8.GetBytes('this is intentionally not an image')
 
-Write-ZipFixture -Path 'natural-sort.cbz' -Entries @{
+Write-ZipFixture -Path 'natural-sort.cbz' -Entries ([ordered]@{
   '10.png' = $png
   '2.png' = $png
   'nested/001.png' = $png
   'ComicInfo.xml' = $comicInfo
   'notes.txt' = $readme
-}
-Write-ZipFixture -Path 'corrupt-page.cbz' -Entries @{
+})
+Write-ZipFixture -Path 'corrupt-page.cbz' -Entries ([ordered]@{
   '001.png' = $png
   '002.png' = $corrupt
-}
-Write-ZipFixture -Path 'unsupported.zip' -Entries @{
+})
+Write-ZipFixture -Path 'unsupported.zip' -Entries ([ordered]@{
   'readme.txt' = $readme
   'page.gif' = $readme
-}
+})
 
 Write-Output "Generated fixtures under $fixtureRoot"
