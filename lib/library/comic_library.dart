@@ -5,7 +5,7 @@ enum LibrarySort { recentlyRead, recentlyAdded, title }
 
 /// Finite states rendered by the shelf instead of parsing infrastructure
 /// exceptions in a Widget.
-enum LibraryStatus { initial, loading, empty, content, warning, fatal }
+enum LibraryStatus { initial, loading, empty, content, warning }
 
 class ComicLibraryEntry {
   const ComicLibraryEntry({

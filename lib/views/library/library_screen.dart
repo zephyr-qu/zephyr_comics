@@ -49,8 +49,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       ? _buildLoadingState(context, path)
                       : snapshot.status == LibraryStatus.warning
                       ? _buildWarningState(context, snapshot)
-                      : snapshot.status == LibraryStatus.fatal
-                      ? _buildFatalState(context, snapshot.message)
                       : snapshot.status == LibraryStatus.empty
                       ? _buildEmptyState(context, snapshot.query)
                       : _buildGrid(context, snapshot.entries),
@@ -231,14 +229,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ],
         ),
         if (entries.isEmpty)
-          Expanded(child: _buildFatalState(context, snapshot.message))
+          Expanded(child: _buildNoAccessState(context, snapshot.message))
         else
           Expanded(child: _buildGrid(context, entries)),
       ],
     );
   }
 
-  Widget _buildFatalState(BuildContext context, String? message) {
+  /// A scan that failed with nothing to fall back on: the root itself is
+  /// unreadable, so the only way forward is picking a new one. Reached from
+  /// [_buildWarningState], not from a `LibraryStatus` of its own.
+  Widget _buildNoAccessState(BuildContext context, String? message) {
     return _centerMessage(
       context,
       icon: Icons.error_outline,

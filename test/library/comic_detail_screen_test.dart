@@ -102,4 +102,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('再点一次确认重置'), findsNothing);
   });
+
+  testWidgets('deleting a bookmark keeps reading progress', (tester) async {
+    const path = '/comics/blue.cbz';
+    final adapter = InMemoryReadingRecordsAdapter();
+    final records = ReadingRecords(adapter: adapter);
+    await adapter.saveProgress(filePath: path, pageIndex: 4, totalPages: 16);
+    await records.addBookmark(path, 4);
+
+    await _pumpDetail(tester, entry: _entry, records: records);
+    expect(find.text('第 5 页'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('删除书签'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('第 5 页'), findsNothing);
+    expect(find.text('还没有书签。阅读时点按页面中央，即可记下当前页。'), findsOneWidget);
+    // The bookmark is its own record: removing it leaves progress untouched.
+    expect(await records.bookmarksFor(path), isEmpty);
+    expect(await records.progressFor(path), isNotNull);
+  });
 }

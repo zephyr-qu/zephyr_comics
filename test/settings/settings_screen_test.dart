@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zephyr_comics/cache/derived_cache.dart';
+import 'package:zephyr_comics/models/reader_mode.dart';
 import 'package:zephyr_comics/models/settings_options.dart';
 import 'package:zephyr_comics/signals/app_signals.dart';
 import 'package:zephyr_comics/theme/zephyr_theme.dart';
@@ -123,6 +124,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('默认阅读模式'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('settings-reader-mode-rtl')));
+    await tester.pumpAndSettle();
+    expect(settingsSnapshot.value.readerMode, ReaderMode.rtl);
 
     // Every option is on screen at once — no dropdown to open.
     expect(find.text('阅读页背景'), findsOneWidget);
@@ -136,6 +140,14 @@ void main() {
     await tester.tap(find.byKey(const Key('settings-theme-dark')));
     await tester.pumpAndSettle();
     expect(settingsSnapshot.value.themePreference, ThemePreference.dark);
+
+    expect(find.text('屏幕方向'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('settings-orientation-landscape')));
+    await tester.pumpAndSettle();
+    expect(
+      settingsSnapshot.value.orientationPreference,
+      OrientationPreference.landscape,
+    );
   });
 
   testWidgets('the storage section reports and clears the derived cache', (

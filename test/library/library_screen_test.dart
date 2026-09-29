@@ -145,4 +145,24 @@ void main() {
     // Choosing closes the sheet again.
     expect(find.byKey(const Key('library-sort-title')), findsNothing);
   });
+
+  testWidgets('a failed scan with no shelf asks for a new root', (
+    tester,
+  ) async {
+    await settings.setScanPath('/comics');
+    librarySnapshot.value = const LibrarySnapshot(
+      status: LibraryStatus.warning,
+      entries: [],
+      message: '扫描失败：无法读取目录',
+    );
+
+    await tester.pumpWidget(const MaterialApp(home: LibraryScreen()));
+
+    // The banner reports the failure and retries; with no previous shelf to
+    // fall back on, the body is the no-access state instead of a grid.
+    expect(find.text('重试'), findsOneWidget);
+    expect(find.text('无法访问漫画目录'), findsOneWidget);
+    expect(find.text('重新选择目录'), findsOneWidget);
+    expect(find.byType(GridView), findsNothing);
+  });
 }
