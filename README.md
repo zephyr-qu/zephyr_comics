@@ -47,8 +47,7 @@ and `rust/src/frb_generated.rs` are ignored, while `rust/src/lib.rs` declares
 `mod frb_generated;`. A fresh clone must generate them before the Rust crate
 compiles at all — `cargo test` fails until `flutter_rust_bridge_codegen
 generate --config-file flutter_rust_bridge.yaml` has run. Step 2 of the gate
-below runs it for you. Note that `llvm_path` in `flutter_rust_bridge.yaml`
-points at one local machine's LLVM install.
+below runs it for you.
 
 Generate the copyright-free fixtures and run the complete local gate with:
 

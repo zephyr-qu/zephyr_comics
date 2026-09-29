@@ -1,4 +1,8 @@
 rust_input: crate::api
 rust_root: rust/
 dart_output: lib/src/rust
-llvm_path: ["D:/app/scoop/apps/llvm/current"]
+# `flutter_rust_bridge_codegen` can locate `libclang` through `llvm_path`, or
+# through the system library search path when the key is absent. It is unset
+# here on purpose: a machine-local install path must not be committed. If a
+# future FRB version does need it, put LLVM's `bin` directory on `PATH`
+# in your own environment rather than pinning a path in this file.
