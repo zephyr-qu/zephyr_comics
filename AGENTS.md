@@ -35,7 +35,7 @@ rust/src/            Rust 后端
 ├── sort.rs types.rs error.rs lib.rs
 
 rust_builder/        cargokit 打包工程（含 vendored 第三方代码，勿逐个改动）
-tool/                本地脚本：fixture 生成、品牌图标导出、门禁
+tool/                本地脚本：品牌图标导出、门禁
 test/ integration_test/ test_driver/    测试
 brand/logo/          品牌矢量资源
 docs/                PRD、架构、路线图、ADR
@@ -45,17 +45,17 @@ Rust 侧按域组织：小而稳定的模块保持 `rust/src/` 下单文件，�
 
 ## 验证
 
-唯一门禁命令（依次执行：生成 fixture → 生成绑定 → `dart format` 检查 → `flutter analyze` → `flutter test` → `cargo test` → `cargo clippy -D warnings` → release APK 构建）：
+唯一门禁命令（依次执行：生成绑定 → `dart format` 检查 → `flutter analyze` → `flutter test` → `cargo test` → `cargo clippy -D warnings` → release APK 构建）：
 
 ```powershell
 pwsh -NoProfile -File tool/verify_mvp.ps1
 ```
 
-门禁通过后 `git status --porcelain` 必须为空。若被门禁弄脏，先修生成器，不要跳过。
+门禁通过后 `git status --porcelain` 必须为空：门禁只重新生成被忽略的绑定产物，不应该弄脏任何受跟踪文件。
 
 前置依赖：Flutter 3.44+（Dart 3.12+）、Rust/Cargo 及 `clippy` 组件（`rustup component add clippy`）、Android SDK（API 36）、`flutter_rust_bridge_codegen` 可执行文件、LLVM（`llvm-config` 需在 `PATH` 上）。详见 `CONTRIBUTING.md`。
 
-`lib/src/rust/` 与 `rust/src/frb_generated.rs` 不入库，新克隆在 `cargo test` 前必须先跑一次绑定生成（门禁第 2 阶段会做）。
+`lib/src/rust/` 与 `rust/src/frb_generated.rs` 不入库，新克隆在 `cargo test` 前必须先跑一次绑定生成（门禁的第 1 阶段会做）。
 
 ## 代码约定
 

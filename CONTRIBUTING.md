@@ -30,14 +30,15 @@ pwsh -NoProfile -File tool/verify_mvp.ps1
 
 | 阶段 | 含义 |
 |------|------|
-| 生成 fixture | 重新生成 `test/fixtures/` 下的 CBZ/ZIP。生成是字节可复现的：定义没改时，跑完 `git status` 必须仍然干净 |
-| 生成绑定 | 先清空 `lib/src/rust/` 与 `rust/src/frb_generated.rs`，再重新生成 FRB 绑定，避免陈旧产物掩盖问题 |
+| 生成绑定 | 先清空 `lib/src/rust/` 与 `rust/src/frb_generated.rs`，再重新生成 FRB 绑定，避免陈旧产物掩盖问题。这两个路径已被忽略，所以这一步不会弄脏工作树 |
 | Dart 格式检查 | `dart format --output=none --set-exit-if-changed lib test integration_test` |
 | Flutter analyze | `flutter analyze --no-fatal-infos` |
 | Flutter 测试 | `flutter test` |
 | Rust 测试 | `cargo test --manifest-path rust/Cargo.toml` |
 | clippy | `cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings` |
 | release APK | `flutter build apk --release`，产物在 `build/app/outputs/flutter-apk/app-release.apk` |
+
+Rust 测试各自在临时目录里构造 CBZ/ZIP，仓库不存放二进制 fixture；要覆盖新的归档场景，请在测试内构造。
 
 两类已知噪声：
 

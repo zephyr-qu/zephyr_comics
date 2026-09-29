@@ -15,7 +15,6 @@ function Invoke-Stage {
   }
 }
 
-Invoke-Stage 'Generate fixtures' { & pwsh -NoProfile -File tool/generate_fixtures.ps1 }
 Invoke-Stage 'Generate Rust bindings' {
   # Regenerate from scratch: stale files left behind by removed API modules
   # would otherwise survive and make a fresh clone differ from a warm tree.

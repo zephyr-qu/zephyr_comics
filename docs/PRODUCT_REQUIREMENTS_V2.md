@@ -178,8 +178,8 @@ Android 返回操作先关闭已打开的工具栏或浮层；否则保存进度
 
 自动化验证包含：
 
-- 一个生成的小型 CBZ fixture，含可排序页面、元数据、一个不受支持的条目与一个坏页变体。
-- Dart 格式检查、Flutter 静态分析、Flutter 测试、Rust 测试与 release APK 构建，通过一条本地命令完成。
+- Rust 测试各自在临时目录中构造 CBZ/ZIP，覆盖自然排序、元数据、损坏页面与不受支持的条目等场景；仓库不存放二进制 fixture。
+- Dart 格式检查、Flutter 静态分析、Flutter 测试、Rust 测试、Rust clippy 与 release APK 构建，通过一条本地命令完成。
 - SQLite schema 版本管理，以及从当前 schema 出发的迁移测试。数据库升级不得删除进度或书签。
 
 在用户按文档执行 profile/release 流程并报告耗时与内存证据之前，真机性能仍属未完成。

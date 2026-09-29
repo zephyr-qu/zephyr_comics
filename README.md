@@ -44,13 +44,13 @@ flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml
 
 ### 门禁
 
-生成无版权的测试 fixture，并运行完整的本地门禁：
+运行完整的本地门禁：
 
 ```powershell
 pwsh -NoProfile -File tool/verify_mvp.ps1
 ```
 
-门禁依次执行：生成 fixture、生成绑定、`dart format` 检查、`flutter analyze`、`flutter test`、`cargo test`、`cargo clippy -D warnings`、release APK 构建。它会先重新生成 fixture 与绑定，跑完后工作树保持干净（fixture 生成是字节可复现的）。产物 APK 位于 `build/app/outputs/flutter-apk/app-release.apk`。
+门禁依次执行：生成绑定、`dart format` 检查、`flutter analyze`、`flutter test`、`cargo test`、`cargo clippy -D warnings`、release APK 构建。它会先重新生成绑定（这两个路径已被忽略），跑完后工作树保持干净。产物 APK 位于 `build/app/outputs/flutter-apk/app-release.apk`。
 
 > release 构建会打印一条关于缺少 `CupertinoIcons` 字体的 tree-shaker 警告。这是 Flutter 工具链的已知缺陷（[flutter#119074](https://github.com/flutter/flutter/issues/119074)），应用自身不渲染任何 Cupertino 图标，因此可以忽略；`pubspec.yaml` 中也记录了这一点。
 
