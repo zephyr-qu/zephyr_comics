@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t d">
-  <title id="t">Zephyr Comics — folded Z, single colour</title>
-  <desc id="d">The folded Z in one colour. Intended for dark backgrounds.</desc>
-  <g id="mark" fill="none" stroke="#EDE6DA" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M19 17H44L35.6 29"/>
-    <path d="M35.6 29L23 47h20c3.5 0 5.5-1.5 7-4"/>
-  </g>
-</svg>

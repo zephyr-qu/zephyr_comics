@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 130" width="160" height="130" role="img" aria-labelledby="t d">
+  <title id="t">Zephyr Comics</title>
+  <desc id="d">The open spread above the Zephyr Comics wordmark, with a brass hairline between them.</desc>
+  <g transform="translate(52.8 4) scale(0.85)">
+    <path d="M4 19L30 11V52L4 60Z" fill="#EDE6DA"/>
+    <path d="M34 11L60 19V60L34 52Z" fill="#C9A86A"/>
+  </g>
+  <path d="M48 76h64" fill="none" stroke="#C9A86A" stroke-width="1.5"/>
+  <text x="82" y="98" text-anchor="middle" font-family="serif" font-size="24" font-weight="600" letter-spacing="2" fill="#EDE6DA">ZEPHYR</text>
+  <text x="82" y="116" text-anchor="middle" font-family="monospace" font-size="9.5" letter-spacing="4.2" fill="#C9A86A">COMICS</text>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t d">
+  <title id="t">Zephyr Comics — open spread, single colour</title>
+  <desc id="d">The open pages as a bare mark in one colour. Intended for dark backgrounds.</desc>
+  <g fill="#EDE6DA">
+    <path d="M4 19L30 11V52L4 60Z"/>
+    <path d="M34 11L60 19V60L34 52Z"/>
+  </g>
+</svg>
