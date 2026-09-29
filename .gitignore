@@ -37,6 +37,12 @@ migrate_working_dir/
 /lib/src/rust/
 /rust/src/frb_generated.rs
 
+# Local tool state — per-machine, not part of the app
+/.commandcode/
+
+# Design prototypes (local reference material, never shipped)
+/designs/
+
 # Symbolication related
 app.*.symbols
 
