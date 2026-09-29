@@ -37,7 +37,6 @@ migrate_working_dir/
 /rust/src/frb_generated.rs
 
 # Local tool state — per-machine, not part of the app
-# Local tool state — per-machine, not part of the app
 /.commandcode/
 /.ruff_cache/
 /android/.kotlin/
