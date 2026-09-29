@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t d">
+  <title id="t">Zephyr Comics — folded Z</title>
+  <desc id="d">A Z read as a folded sheet: the upper face pale, the lower face brass, its bottom bar sweeping up into a wind tail, on a warm-black rounded square.</desc>
+  <rect width="64" height="64" rx="14" fill="#0E0D0C"/>
+  <g id="mark" fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19 17H44L35.6 29" stroke="#EDE6DA"/>
+    <path d="M35.6 29L23 47h20c3.5 0 5.5-1.5 7-4" stroke="#C9A86A"/>
+  </g>
+</svg>

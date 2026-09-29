@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t d">
+  <title id="t">Zephyr Comics — panel stack, single colour</title>
+  <desc id="d">The panel stack in one colour: two outlined panels behind a solid front panel. Intended for dark backgrounds.</desc>
+  <g id="mark">
+    <rect x="16" y="26" width="17" height="22" rx="3" fill="none" stroke="#EDE6DA" stroke-width="1.6"/>
+    <rect x="23" y="21" width="17" height="22" rx="3" fill="none" stroke="#EDE6DA" stroke-width="1.6"/>
+    <rect x="30" y="16" width="17" height="22" rx="3" fill="#EDE6DA"/>
+  </g>
+</svg>

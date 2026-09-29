@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 196 80" width="196" height="80" role="img" aria-labelledby="t d">
+  <title id="t">Zephyr Comics</title>
+  <desc id="d">The panel stack mark beside the Zephyr Comics wordmark: ZEPHYR in serif, COMICS in monospace below it.</desc>
+  <g transform="translate(12 20.2) scale(0.62)">
+    <rect x="16" y="26" width="17" height="22" rx="3" fill="none" stroke="#514E4A" stroke-width="1.6"/>
+    <rect x="23" y="21" width="17" height="22" rx="3" fill="none" stroke="#8B8680" stroke-width="1.6"/>
+    <rect x="30" y="16" width="17" height="22" rx="3" fill="#C9A86A"/>
+  </g>
+  <text x="72" y="43" font-family="serif" font-size="26" font-weight="600" letter-spacing="0.5" fill="#EDE6DA">ZEPHYR</text>
+  <text x="73" y="61" font-family="monospace" font-size="10" letter-spacing="4.4" fill="#C9A86A">COMICS</text>
+</svg>
