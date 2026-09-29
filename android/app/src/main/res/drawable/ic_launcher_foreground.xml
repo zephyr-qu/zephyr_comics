@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Adaptive icon foreground: the wind mark's three ribbons on the 108dp canvas.
-  The 64-unit brand grid (brand/logo/icon.svg) is mapped into the central 72dp
-  safe zone: scale = 72 / 64 = 1.125, translate = (108 - 72) / 2 = 18.
--->
+<!-- The brass seal with the open book knocked out of it, drawn in the central
+     72dp of the 108dp canvas: scale 72/64 = 1.125, translate (108-72)/2 = 18.
+     The disc is a path because a VectorDrawable has no <circle>, and the book
+     is drawn in the background's paper rather than knocked out, so the two
+     layers stay in step with brand/logo/icon.svg. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -15,13 +15,13 @@
         android:translateX="18"
         android:translateY="18">
         <path
-            android:fillColor="#C9A86A"
-            android:pathData="M8 36Q32 24 56 17L56 22Q32 30 8 51Z" />
+            android:pathData="M9 32a23 23 0 1 0 46 0a23 23 0 0 0-46 0Z"
+            android:fillColor="#7E6128" />
         <path
-            android:fillColor="#EDE6DA"
-            android:pathData="M14 46Q36 36 58 30L58 35Q36 42 14 58Z" />
+            android:pathData="M18 25L31 19.5L31 35L18 39.5Z"
+            android:fillColor="#F4EFE6" />
         <path
-            android:fillColor="#8B8680"
-            android:pathData="M26 52Q42 46 56 43L56 47Q42 51 26 60Z" />
+            android:pathData="M33 19.5L46 25L46 39.5L33 35Z"
+            android:fillColor="#F4EFE6" />
     </group>
 </vector>

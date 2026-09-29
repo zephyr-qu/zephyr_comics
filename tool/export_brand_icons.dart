@@ -1,4 +1,4 @@
-// Regenerates the Android launcher icon PNGs from the wind mark geometry.
+// Regenerates the Android launcher icon PNGs from the seal mark geometry.
 //
 // Run it with:
 //
@@ -10,11 +10,12 @@
 // browser, no inkscape/ImageMagick, no new pub package) and deterministic.
 //
 // The brand SVGs are inputs, never outputs. `brand/logo/icon.svg` is the source
-// of truth for the geometry; `windRibbons` below repeats its three `d` strings
-// verbatim and `test/brand/launcher_icon_test.dart` fails if the two diverge.
+// of truth for the geometry; `sealPathData` and `bookPages` below repeat its `d`
+// strings verbatim and `test/brand/launcher_icon_test.dart` fails if the two
+// diverge.
 //
 // Before replacing a committed PNG the exporter re-decodes the bytes it is
-// about to write and asserts the pixel dimensions and three sample colours, so
+// about to write and asserts the pixel dimensions and sample colours, so
 // a renderer regression cannot ship a blank or mis-sized launcher icon. Writes
 // go to a temporary file in the same directory and are then renamed into place,
 // so an aborted run leaves the previous icon untouched.
@@ -35,31 +36,37 @@ import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// The wind mark is drawn on a 64-unit grid (`viewBox="0 0 64 64"`).
+/// The mark is drawn on a 64-unit grid (`viewBox="0 0 64 64"`).
 const int brandGrid = 64;
 
-/// Corner radius of the legacy tile, in brand-grid units (`rx="14"`).
-const double tileCornerRadius = 14;
+/// The legacy tile's corner radius in brand-grid units (`rx="13.5"`), on a tile
+/// inset by half a unit so its hairline edge is not clipped.
+const double tileCornerRadius = 13.5;
 
-/// Warm black, the theme `surface` (and `--bg` in `brand/preview.html`).
-const int tileColorArgb = 0xFF0E0D0C;
+/// Paper, the light theme's `surface` (and the tile in `brand/logo/icon.svg`).
+const int tileColorArgb = 0xFFF4EFE6;
 
-/// One of the three windswept ribbons. [argb] uses the same palette as the
-/// theme; [pathData] is the SVG `d` attribute copied verbatim from
-/// `brand/logo/icon.svg`.
-class WindRibbon {
-  const WindRibbon(this.pathData, this.argb);
+/// The hairline that keeps a paper tile from melting into a white home screen.
+const int tileEdgeColorArgb = 0xFFDCD5C7;
 
-  final String pathData;
-  final int argb;
-}
+/// The deeper brass the light theme uses: the prototype's `#C9A86A` is only
+/// 3.10:1 on paper, this is 5.05:1.
+const int sealColorArgb = 0xFF7E6128;
 
-/// The three ribbons, top to bottom, exactly as they appear in
-/// `brand/logo/icon.svg`.
-const List<WindRibbon> windRibbons = <WindRibbon>[
-  WindRibbon('M8 36Q32 24 56 17L56 22Q32 30 8 51Z', 0xFFC9A86A),
-  WindRibbon('M14 46Q36 36 58 30L58 35Q36 42 14 58Z', 0xFFEDE6DA),
-  WindRibbon('M26 52Q42 46 56 43L56 47Q42 51 26 60Z', 0xFF8B8680),
+/// The seal's disc in brand-grid units (`<circle cx="32" cy="32" r="23">`).
+const double sealCenter = 32;
+const double sealRadius = 23;
+
+/// The same disc as path data. The adaptive foreground needs it because a
+/// VectorDrawable has no `<circle>` element, so the drawable spells the disc out
+/// and the guard test compares the two.
+const String sealPathData = 'M9 32a23 23 0 1 0 46 0a23 23 0 0 0-46 0Z';
+
+/// The open book knocked out of the seal: two page quadrilaterals with a gap
+/// between them for the spine. Copied verbatim from `brand/logo/icon.svg`.
+const List<String> bookPages = <String>[
+  'M18 25L31 19.5L31 35L18 39.5Z',
+  'M33 19.5L46 25L46 39.5L33 35Z',
 ];
 
 /// One legacy density bucket: a 48dp icon at the bucket scale.
@@ -104,9 +111,17 @@ class IconSample {
 /// - one interior pixel per ribbon, so all three fills are checked;
 /// - the lower-middle pixel sits on the warm-black tile below the ribbons.
 ///
-/// The samples are deliberately interior rather than at the exact geometric
-/// centre: the brass ribbon's lower edge passes within half a pixel of the
-/// centre at 48px, so a centre sample would measure antialiasing, not colour.
+/// The pixels checked for every rendered size, on the 64-unit brand grid.
+///
+/// - the top-left pixel is outside the rounded tile corner, so it must stay
+///   transparent (the stock Flutter icon fails this);
+/// - a pixel on the seal's brass, beside the book;
+/// - a pixel inside the left page, which must be the paper the book is cut in;
+/// - a pixel on the seal's brass below the book, clear of both pages;
+/// - a pixel on the tile outside the seal, which must be paper too.
+///
+/// The samples are deliberately interior rather than on an edge: a boundary
+/// pixel would measure antialiasing rather than a palette colour.
 List<IconSample> iconSamples(int size) {
   IconSample at(int gridX, int gridY, int argb, String label) => IconSample(
     (size * gridX) ~/ brandGrid,
@@ -116,16 +131,16 @@ List<IconSample> iconSamples(int size) {
   );
   return <IconSample>[
     const IconSample(0, 0, 0x00000000, 'top-left corner (transparent)'),
-    at(12, 40, windRibbons[0].argb, 'brass ribbon'),
-    at(24, 46, windRibbons[1].argb, 'ink ribbon'),
-    at(27, 55, windRibbons[2].argb, 'grey ribbon'),
-    at(32, 60, tileColorArgb, 'tile below the ribbons (warm black)'),
+    at(12, 32, sealColorArgb, 'seal brass beside the book'),
+    at(24, 32, tileColorArgb, 'left page (paper)'),
+    at(32, 47, sealColorArgb, 'seal brass below the book'),
+    at(4, 32, tileColorArgb, 'tile outside the seal (paper)'),
   ];
 }
 
-/// Parses the absolute `M`/`L`/`Q`/`Z` subset of SVG path data used by the
-/// wind mark into a [ui.Path]. Deriving the path from the same string the
-/// drift guard checks keeps the exporter and `brand/logo/icon.svg` in step.
+/// Parses the absolute `M`/`L`/`Q`/`Z` subset of SVG path data used by the book
+/// pages into a [ui.Path]. Deriving the path from the same string the drift guard
+/// checks keeps the exporter and `brand/logo/icon.svg` in step.
 ui.Path parseSvgPath(String d) {
   final List<String> tokens = RegExp(
     r'[MLQZ]|-?\d+(?:\.\d+)?',
@@ -157,36 +172,46 @@ ui.Path parseSvgPath(String d) {
   return path;
 }
 
-/// Rasterises the rounded-tile legacy artwork at [size] x [size] and returns
-/// the PNG bytes.
+/// Rasterises the rounded-tile legacy artwork at [size] x [size] and returns the
+/// PNG bytes: paper tile, hairline edge, brass seal, book knocked out of it.
 ///
-/// [ribbons] defaults to [windRibbons]; it is a parameter so a caller can
-/// render deliberately wrong artwork when exercising the guard. [blank] skips
-/// drawing entirely, which yields a fully transparent PNG — the shape a broken
-/// renderer would produce and the one [verifyRenderedIcon] must refuse.
+/// [pages] defaults to [bookPages]; it is a parameter so a caller can render
+/// deliberately wrong artwork when exercising the guard. [blank] skips drawing
+/// entirely, which yields a fully transparent PNG — the shape a broken renderer
+/// would produce and the one [verifyRenderedIcon] must refuse.
 Future<Uint8List> renderLegacyTile(
   int size, {
-  List<WindRibbon>? ribbons,
+  List<String>? pages,
   bool blank = false,
 }) async {
-  final List<WindRibbon> usedRibbons = ribbons ?? windRibbons;
+  final List<String> usedPages = pages ?? bookPages;
   final double scale = size / brandGrid;
   final ui.PictureRecorder recorder = ui.PictureRecorder();
   final ui.Canvas canvas = ui.Canvas(recorder);
   if (!blank) {
+    final ui.RRect tile = ui.RRect.fromRectAndRadius(
+      ui.Rect.fromLTWH(0.5 * scale, 0.5 * scale, size - scale, size - scale),
+      ui.Radius.circular(tileCornerRadius * scale),
+    );
+    canvas.drawRRect(tile, ui.Paint()..color = const ui.Color(tileColorArgb));
     canvas.drawRRect(
-      ui.RRect.fromRectAndRadius(
-        ui.Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
-        ui.Radius.circular(tileCornerRadius * scale),
-      ),
-      ui.Paint()..color = const ui.Color(tileColorArgb),
+      tile,
+      ui.Paint()
+        ..color = const ui.Color(tileEdgeColorArgb)
+        ..style = ui.PaintingStyle.stroke
+        ..strokeWidth = scale,
     );
     canvas.save();
     canvas.scale(scale);
-    for (final WindRibbon ribbon in usedRibbons) {
+    canvas.drawCircle(
+      const ui.Offset(sealCenter, sealCenter),
+      sealRadius,
+      ui.Paint()..color = const ui.Color(sealColorArgb),
+    );
+    for (final String page in usedPages) {
       canvas.drawPath(
-        parseSvgPath(ribbon.pathData),
-        ui.Paint()..color = ui.Color(ribbon.argb),
+        parseSvgPath(page),
+        ui.Paint()..color = const ui.Color(tileColorArgb),
       );
     }
     canvas.restore();
@@ -296,7 +321,7 @@ Future<List<String>> exportLauncherIcons({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('exports the Android launcher icons from the wind mark', () async {
+  test('exports the Android launcher icons from the seal mark', () async {
     final String? forced = Platform.environment['ICON_EXPORT_FORCE_SIZE'];
     final String? forcedBlank = Platform.environment['ICON_EXPORT_FORCE_BLANK'];
     final List<String> written = await exportLauncherIcons(

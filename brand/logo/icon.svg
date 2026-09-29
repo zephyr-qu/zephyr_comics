@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t d">
   <title id="t">Zephyr Comics</title>
-  <desc id="d">Three tapered ribbons of wind sweeping up across a warm-black tile, in brass, pale cream and grey.</desc>
-  <rect width="64" height="64" rx="14" fill="#0E0D0C"/>
-  <path d="M8 36Q32 24 56 17L56 22Q32 30 8 51Z" fill="#C9A86A"/>
-  <path d="M14 46Q36 36 58 30L58 35Q36 42 14 58Z" fill="#EDE6DA"/>
-  <path d="M26 52Q42 46 56 43L56 47Q42 51 26 60Z" fill="#8B8680"/>
+  <desc id="d">A brass seal on a paper tile, with an open book knocked out of it.</desc>
+  <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="#F4EFE6" stroke="#DCD5C7"/>
+  <circle cx="32" cy="32" r="23" fill="#7E6128"/>
+  <path d="M18 25L31 19.5L31 35L18 39.5Z" fill="#F4EFE6"/>
+  <path d="M33 19.5L46 25L46 39.5L33 35Z" fill="#F4EFE6"/>
 </svg>

@@ -6,9 +6,10 @@
 <title>Zephyr Comics — Identity</title>
 <style>
   :root {
-    --bg: #0E0D0C; --s1: #161513; --s2: #1E1C19; --line: #262421;
+    --bg: #0E0D0C; --s1: #161513; --line: #262421;
     --tx: #EDE6DA; --tx2: #8B8680; --brass: #C9A86A;
-    --paper: #F4EFE6; --ink: #241F1A; --brass-deep: #7E6128; --ink-muted: #6B6259;
+    --paper: #F4EFE6; --paper-hi: #FBF8F3; --edge: #DCD5C7;
+    --ink: #241F1A; --brass-deep: #7E6128;
   }
   * { box-sizing: border-box; }
   body { margin:0; padding:56px 44px 96px; background:var(--bg); color:var(--tx);
@@ -22,12 +23,12 @@
   section { border-top:1px solid var(--line); margin-top:50px; padding-top:32px; }
   .row { display:flex; gap:24px; align-items:flex-end; flex-wrap:wrap; margin-bottom:22px; }
   .panel { background:var(--s1); border:1px solid var(--line); border-radius:14px; padding:20px 22px; }
-  .paper { background:var(--paper); border-color:#DCD5C7; }
+  .paper { background:var(--paper); border-color:var(--edge); }
   .paper .label, .paper .cell-note { color:#6B6259; }
   .stack { display:flex; gap:18px; align-items:flex-end; }
   .cell { display:flex; flex-direction:column; align-items:center; gap:7px; }
   .cell-note { font-family: ui-monospace, Consolas, monospace; font-size:10.5px; color:var(--tx2); }
-  img { display:block; }
+  img, svg { display:block; }
   table { border-collapse:collapse; font-size:13px; }
   td, th { text-align:left; padding:7px 22px 7px 0; border-bottom:1px solid var(--line); vertical-align:middle; }
   th { font-family: ui-monospace, Consolas, monospace; font-size:10.5px; letter-spacing:.9px;
@@ -39,26 +40,31 @@
   li { margin-bottom:8px; }
   .no { color:#E05A4A; }
   .yes { color:var(--brass); }
-  .clearbox { position:relative; display:inline-block; padding:12px; border:1px dashed var(--line); }
-  .launcher { width:150px; height:150px; overflow:hidden; background:var(--bg);
-              box-shadow: 0 0 0 1px var(--line); }
-  .launcher svg { display:block; width:100%; height:100%; }
+  .clearbox { display:inline-block; padding:12px; border:1px dashed #514E4A; }
+  .masks { display:flex; gap:26px; align-items:flex-start; }
+  .maskwrap { text-align:center; }
+  .maskwrap .label { display:block; margin-top:8px; }
+  .clip { overflow:hidden; width:144px; height:144px; }
+  .clip.circle { border-radius:50%; }
+  .clip.squircle { border-radius:36px; }
+  .clip.plain { border-radius:20px; }
 </style>
 </head>
 <body>
 
 <h1>Zephyr Comics — identity</h1>
 <p class="lede">
-  <b>风带 / Wind.</b> 三道收笔的风带斜扫而过，左上厚、右上收成尖 —— 一笔「西风」，
-  Zephyr 就是西风的名字。图形刻意不画书、不画分格：这套身份里，<b>名字承担「风」，字标承担「漫画」</b>。
-  颜色与字阶全部来自 <code>lib/theme/zephyr_theme.dart</code>，没有引入任何新色值或字体资源。
+  <b>铜印 · 开书。</b>一坨米金圆印，中间凿出一本摊开的书 —— 印章是"这属于我"，
+  摊开的书是"在读"。图形不画分格、不画风、不画抽象线：它就说一件事，而且缩到 24px 还认得出。
+  全套改用<b>浅色系</b>（纸底 + 墨 + 深米金），颜色与字阶仍全部来自
+  <code>lib/theme/zephyr_theme.dart</code>，没有引入任何新色值或字体资源。
 </p>
 
 <section>
   <h2>应用图标</h2>
   <div class="row">
     <div class="panel">
-      <span class="label">暖黑底 / 96 · 48 · 32 · 24</span>
+      <span class="label">纸底 / 96 · 48 · 32 · 24</span>
       <div class="stack" style="margin-top:16px">
         <div class="cell"><img src="logo/icon.svg" width="96" height="96" alt=""><span class="cell-note">96</span></div>
         <div class="cell"><img src="logo/icon.svg" width="48" height="48" alt=""><span class="cell-note">48</span></div>
@@ -66,105 +72,87 @@
         <div class="cell"><img src="logo/icon.svg" width="24" height="24" alt=""><span class="cell-note">24</span></div>
       </div>
     </div>
-    <div class="panel paper">
-      <span class="label">纸色底</span>
-      <div style="margin-top:16px"><img src="logo/icon.svg" width="96" height="96" alt=""></div>
+    <div class="panel">
+      <span class="label">暖黑底（纸底板自成底色，放哪都成立）</span>
+      <div class="stack" style="margin-top:16px">
+        <div class="cell"><img src="logo/icon.svg" width="96" height="96" alt=""></div>
+        <div class="cell"><img src="logo/icon.svg" width="48" height="48" alt=""></div>
+      </div>
     </div>
     <div class="panel">
       <span class="label">安全间距 / 最小尺寸</span>
-      <div style="margin-top:16px">
-        <span class="clearbox"><img src="logo/icon.svg" width="64" height="64" alt=""></span>
-      </div>
+      <div style="margin-top:16px"><span class="clearbox"><img src="logo/icon.svg" width="64" height="64" alt=""></span></div>
       <div class="cell-note" style="margin-top:12px">四周留白 = 图形高度的 1/4（64 格里 12px）<br>数字最小 24px，印刷最小 8mm</div>
     </div>
   </div>
 </section>
 
 <section>
-  <h2>自适应图标 / Android 落地</h2>
-  <p class="lede">
-    自适应图标在 <b>108dp 画布</b>上合成：背景层是满幅暖黑（圆角交给系统的遮罩，不再自己描圆角），前景层是三条风带，
-    按 <code>scale = 72/64 = 1.125</code>、<code>translate = 18</code> 压进中央 <b>72dp 安全区</b>。
-    下面把安全区标出来，并分别套上圆形与方圆遮罩，让「风带不会被裁到」这件事看得见。
-  </p>
-
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <defs>
-      <g id="zephyr-adaptive">
-        <rect width="108" height="108" fill="#0E0D0C"/>
-        <g transform="translate(18 18) scale(1.125)">
-          <path d="M8 36Q32 24 56 17L56 22Q32 30 8 51Z" fill="#C9A86A"/>
-          <path d="M14 46Q36 36 58 30L58 35Q36 42 14 58Z" fill="#EDE6DA"/>
-          <path d="M26 52Q42 46 56 43L56 47Q42 51 26 60Z" fill="#8B8680"/>
-        </g>
-      </g>
-      <g id="zephyr-monochrome" transform="translate(18 18) scale(1.125)" fill="currentColor">
-        <path d="M8 36Q32 24 56 17L56 22Q32 30 8 51Z"/>
-        <path d="M14 46Q36 36 58 30L58 35Q36 42 14 58Z"/>
-        <path d="M26 52Q42 46 56 43L56 47Q42 51 26 60Z"/>
-      </g>
-    </defs>
-  </svg>
-
+  <h2>自适应图标（API 26+）</h2>
   <div class="row">
     <div class="panel">
-      <span class="label">108dp 画布 / 72dp 安全区</span>
-      <div style="margin-top:16px">
-        <svg viewBox="0 0 108 108" width="150" height="150" role="img" aria-label="自适应图标的背景、前景与安全区">
-          <use href="#zephyr-adaptive"/>
-          <rect x="18" y="18" width="72" height="72" fill="none" stroke="#C9A86A" stroke-opacity=".6" stroke-dasharray="3 3"/>
-        </svg>
-      </div>
-      <div class="cell-note" style="margin-top:12px">虚线内为中央 72dp；外侧 18dp 供遮罩裁剪与视差</div>
-    </div>
-    <div class="panel">
-      <span class="label">圆形遮罩</span>
-      <div class="launcher" style="border-radius:50%; margin-top:16px">
-        <svg viewBox="0 0 108 108"><use href="#zephyr-adaptive"/></svg>
-      </div>
-    </div>
-    <div class="panel">
-      <span class="label">方圆遮罩</span>
-      <div class="launcher" style="border-radius:26%; margin-top:16px">
-        <svg viewBox="0 0 108 108"><use href="#zephyr-adaptive"/></svg>
-      </div>
-    </div>
-    <div class="panel">
-      <span class="label">单色层 / 主题着色示例</span>
-      <div class="launcher" style="border-radius:26%; margin-top:16px; color:#C9E4FF; background:#22303C">
-        <svg viewBox="0 0 108 108"><use href="#zephyr-monochrome"/></svg>
+      <span class="label">背景层（满幅纸色）+ 前景层（铜印）· 虚线内为 72dp 安全区</span>
+      <div class="masks" style="margin-top:16px">
+        <div class="maskwrap">
+          <div style="position:relative;width:144px;height:144px;background:#F4EFE6;border-radius:20px">
+            <svg viewBox="0 0 108 108" width="144" height="144" style="position:absolute;inset:0">
+              <g transform="translate(18 18) scale(1.125)">
+                <path d="M9 32a23 23 0 1 0 46 0a23 23 0 0 0-46 0Z" fill="#7E6128"/>
+                <path d="M18 25L31 19.5L31 35L18 39.5Z" fill="#F4EFE6"/>
+                <path d="M33 19.5L46 25L46 39.5L33 35Z" fill="#F4EFE6"/>
+              </g>
+              <rect x="18" y="18" width="72" height="72" fill="none" stroke="#8B8680" stroke-width="0.7" stroke-dasharray="3 3"/>
+            </svg>
+          </div>
+          <span class="label">108dp 画布</span>
+        </div>
+        <div class="maskwrap">
+          <div class="clip circle" style="background:#F4EFE6;position:relative">
+            <svg viewBox="0 0 108 108" width="144" height="144">
+              <g transform="translate(18 18) scale(1.125)">
+                <path d="M9 32a23 23 0 1 0 46 0a23 23 0 0 0-46 0Z" fill="#7E6128"/>
+                <path d="M18 25L31 19.5L31 35L18 39.5Z" fill="#F4EFE6"/>
+                <path d="M33 19.5L46 25L46 39.5L33 35Z" fill="#F4EFE6"/>
+              </g>
+            </svg>
+          </div>
+          <span class="label">圆形遮罩</span>
+        </div>
+        <div class="maskwrap">
+          <div class="clip squircle" style="background:#F4EFE6">
+            <svg viewBox="0 0 108 108" width="144" height="144">
+              <g transform="translate(18 18) scale(1.125)">
+                <path d="M9 32a23 23 0 1 0 46 0a23 23 0 0 0-46 0Z" fill="#7E6128"/>
+                <path d="M18 25L31 19.5L31 35L18 39.5Z" fill="#F4EFE6"/>
+                <path d="M33 19.5L46 25L46 39.5L33 35Z" fill="#F4EFE6"/>
+              </g>
+            </svg>
+          </div>
+          <span class="label">方圆遮罩</span>
+        </div>
+        <div class="maskwrap">
+          <div class="clip plain" style="background:#1A1815;display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 108 108" width="144" height="144">
+              <g transform="translate(18 18) scale(1.125)">
+                <path d="M18 25L31 19.5L31 35L18 39.5Z" fill="#C9A86A"/>
+                <path d="M33 19.5L46 25L46 39.5L33 35Z" fill="#C9A86A"/>
+              </g>
+            </svg>
+          </div>
+          <span class="label">单色层（系统染色示意）</span>
+        </div>
       </div>
     </div>
   </div>
-
-  <div class="cols" style="margin-top:10px">
-    <div>
-      <span class="label">生成的资源</span>
-      <table style="margin-top:10px">
-        <tr><th>文件</th><th>角色</th><th>来源</th></tr>
-        <tr><td><code>mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher.png</code></td><td>48 / 72 / 96 / 144 / 192 px</td><td>导出脚本</td></tr>
-        <tr><td><code>mipmap-anydpi-v26/ic_launcher.xml</code></td><td>背景 + 前景 + 单色层</td><td>手写</td></tr>
-        <tr><td><code>drawable/ic_launcher_foreground.xml</code></td><td>风带前景（108 视口）</td><td>手写</td></tr>
-        <tr><td><code>drawable/ic_launcher_monochrome.xml</code></td><td>单色剪影</td><td>手写</td></tr>
-        <tr><td><code>values/ic_launcher_background.xml</code></td><td>背景 <code>#0E0D0C</code></td><td>手写</td></tr>
-      </table>
-    </div>
-    <div>
-      <span class="label">重新生成</span>
-      <p class="lede" style="margin:12px 0 0; max-width:56ch">
-        一条命令从 <code>brand/logo/icon.svg</code> 重出全部 PNG：
-      </p>
-      <p style="margin:10px 0 0"><code>flutter test tool/export_brand_icons.dart</code></p>
-      <div class="cell-note" style="margin-top:14px">
-        导出器用 <code>dart:ui</code> 渲染，写盘前会重新解码校尺寸、采样颜色，不合格即中止；
-        日常由 <code>test/brand/launcher_icon_test.dart</code> 守门，缺图、尺寸错、不是风标都会红。
-      </div>
-    </div>
+  <div class="cell-note">
+    背景层必须是满幅纸色（<code>#F4EFE6</code>）—— 启动器会在它上面套自己的遮罩；
+    前景层把 64 格压进 108dp 画布中央的 72dp（scale 1.125 / translate 18）。
+    单色层只留书、不留圆印：主题图标是单色染色，一圈实心会被染成一块饼。
   </div>
 </section>
 
 <section>
-  <h2>横向锁定</h2>
+  <h2>横向 / 竖向锁定</h2>
   <div class="row">
     <div class="panel">
       <span class="label">深底</span>
@@ -175,42 +163,25 @@
       <div style="margin-top:16px"><img src="logo/horizontal-light.svg" width="200" height="80" alt="Zephyr Comics"></div>
     </div>
   </div>
-  <div class="cell-note">图形与字标之间那条米金细线，就是阅读页底部那条进度细线 —— 它是这个应用自己的签名，不是装饰。</div>
-</section>
-
-<section>
-  <h2>竖向锁定</h2>
   <div class="row">
     <div class="panel">
-      <span class="label">深底</span>
-      <div style="margin-top:16px"><img src="logo/vertical.svg" width="160" height="130" alt="Zephyr Comics"></div>
+      <span class="label">竖版 · 深底</span>
+      <div style="margin-top:16px"><img src="logo/vertical.svg" width="160" height="124" alt="Zephyr Comics"></div>
     </div>
     <div class="panel paper">
-      <span class="label">浅底</span>
-      <div style="margin-top:16px"><img src="logo/vertical-light.svg" width="160" height="130" alt="Zephyr Comics"></div>
+      <span class="label">竖版 · 浅底</span>
+      <div style="margin-top:16px"><img src="logo/vertical-light.svg" width="160" height="124" alt="Zephyr Comics"></div>
     </div>
-  </div>
-</section>
-
-<section>
-  <h2>单色标记</h2>
-  <div class="row">
     <div class="panel">
-      <span class="label">深底用 / 暖黑 · --s1 · --s2</span>
+      <span class="label">单色标记（深底 / 浅底）</span>
       <div class="stack" style="margin-top:16px">
         <div class="cell" style="background:#0E0D0C;border-radius:12px;padding:12px"><img src="logo/mark-dark.svg" width="64" height="64" alt=""></div>
-        <div class="cell" style="background:#161513;border-radius:12px;padding:12px"><img src="logo/mark-dark.svg" width="64" height="64" alt=""></div>
-        <div class="cell" style="background:#1E1C19;border-radius:12px;padding:12px"><img src="logo/mark-dark.svg" width="64" height="64" alt=""></div>
-      </div>
-      <div class="cell-note" style="margin-top:12px">用于水印、封面角标、加载态</div>
-    </div>
-    <div class="panel paper">
-      <span class="label">浅底用 / 纸 · 纸白</span>
-      <div class="stack" style="margin-top:16px">
         <div class="cell" style="background:#F4EFE6;border-radius:12px;padding:12px"><img src="logo/mark-light.svg" width="64" height="64" alt=""></div>
-        <div class="cell" style="background:#FBF8F3;border-radius:12px;padding:12px"><img src="logo/mark-light.svg" width="64" height="64" alt=""></div>
       </div>
     </div>
+  </div>
+  <div class="cell-note">
+    图形与字标之间那条细线，就是阅读页底部那条进度细线 —— 它是这个应用自己的签名，不是装饰。
   </div>
 </section>
 
@@ -220,16 +191,16 @@
     <div>
       <table>
         <tr><th>用途</th><th>值</th><th>来源</th></tr>
-        <tr><td><span class="dot" style="background:#0E0D0C"></span> 底板</td><td><code>#0E0D0C</code></td><td>主题 <code>surface</code></td></tr>
-        <tr><td><span class="dot" style="background:#C9A86A"></span> 米金</td><td><code>#C9A86A</code></td><td>主题 <code>primary</code></td></tr>
-        <tr><td><span class="dot" style="background:#EDE6DA"></span> 墨</td><td><code>#EDE6DA</code></td><td>主题 <code>onSurface</code></td></tr>
-        <tr><td><span class="dot" style="background:#8B8680"></span> 次字</td><td><code>#8B8680</code></td><td>主题 <code>onSurfaceVariant</code></td></tr>
-        <tr><td><span class="dot" style="background:#7E6128"></span> 深米金（浅底）</td><td><code>#7E6128</code></td><td>主题浅色 <code>primary</code></td></tr>
-        <tr><td><span class="dot" style="background:#241F1A"></span> 墨（浅底）</td><td><code>#241F1A</code></td><td>主题浅色 <code>onSurface</code></td></tr>
+        <tr><td><span class="dot" style="background:#F4EFE6"></span> 底板 / 背景层</td><td><code>#F4EFE6</code></td><td>主题浅色 <code>surface</code></td></tr>
+        <tr><td><span class="dot" style="background:#DCD5C7"></span> 底板描边</td><td><code>#DCD5C7</code></td><td>主题浅色 <code>outlineVariant</code></td></tr>
+        <tr><td><span class="dot" style="background:#7E6128"></span> 圆印 / 书</td><td><code>#7E6128</code></td><td>主题浅色 <code>primary</code></td></tr>
+        <tr><td><span class="dot" style="background:#241F1A"></span> 浅底字标</td><td><code>#241F1A</code></td><td>主题浅色 <code>onSurface</code></td></tr>
+        <tr><td><span class="dot" style="background:#EDE6DA"></span> 深底字标</td><td><code>#EDE6DA</code></td><td>主题 <code>onSurface</code></td></tr>
+        <tr><td><span class="dot" style="background:#C9A86A"></span> 深底细线</td><td><code>#C9A86A</code></td><td>主题 <code>primary</code></td></tr>
       </table>
       <div class="cell-note" style="margin-top:14px">
-        浅色底换色不是偏好问题：原型那档米金在纸底上只有 3.10:1，不到 WCAG AA；
-        深米金是 5.05:1。这两条数字来自 <code>zephyr_theme.dart</code> 的注释与主题测试。
+        浅色底必须用深米金：原型那档米金在纸上只有 3.10:1，不到 WCAG AA；<code>#7E6128</code> 是 5.05:1。
+        这两条数字来自 <code>zephyr_theme.dart</code> 的注释与主题测试。
       </div>
     </div>
     <div>
@@ -253,29 +224,37 @@
       <span class="label">要</span>
       <ul>
         <li><span class="yes">✓</span> 深底用深底文件、浅底用浅底文件 —— 两套是配好对的，别自己换色。</li>
-        <li><span class="yes">✓</span> 缩放保持等比；锁定组里图形与字标的间距、细线长度都由文件给出，不要重排。</li>
+        <li><span class="yes">✓</span> 缩放保持等比；锁定组里图形、细线、间距都由文件给出，不要重排。</li>
         <li><span class="yes">✓</span> 需要单色时用 <code>mark-dark</code> / <code>mark-light</code>，不要给彩色版去饱和。</li>
-        <li><span class="yes">✓</span> 小到 24px 时优先用方图标，不要硬塞横向锁定（字会先糊）。</li>
+        <li><span class="yes">✓</span> 小到 24px 优先用方图标，别硬塞横向锁定（字会先糊）。</li>
       </ul>
     </div>
     <div>
       <span class="label">不要</span>
       <ul>
-        <li><span class="no">✗</span> 拉伸、压扁、旋转、切掉风带的收笔尖。</li>
-        <li><span class="no">✗</span> 加阴影、描边、发光、渐变 —— 风带是靠锥形收笔立住的，加效果就散。</li>
-        <li><span class="no">✗</span> 把米金换成其它金色，或用非主题色。</li>
-        <li><span class="no">✗</span> 把图形放进比安全间距更窄的空间。</li>
+        <li><span class="no">✗</span> 拉伸、压扁、旋转，或把圆印换成方印、把书换成对称的两页。</li>
+        <li><span class="no">✗</span> 加阴影、描边、发光、渐变 —— 这枚印是靠"实心圆 + 凿空"的对比立住的。</li>
+        <li><span class="no">✗</span> 在浅底上使用原型那档亮米金（对比不足），或在深底上用深米金（看不见）。</li>
+        <li><span class="no">✗</span> 把书填成米金、圆印填成纸色（正负形一反，读起来就成了一块饼）。</li>
       </ul>
     </div>
   </div>
 </section>
 
 <section>
-  <h2>还没做</h2>
+  <h2>生成物与重新导出</h2>
   <ul>
-    <li><b>字标描边成路径</b>：现在 <code>ZEPHYR</code> / <code>COMICS</code> 是 <code>&lt;text&gt;</code>，依赖系统字体。</li>
-    <li><b>启动画面</b>：<code>drawable/launch_background.xml</code> 还是 Flutter 默认的白屏，对暖黑应用来说不对，值得单独一个任务。</li>
+    <li><code>android/app/src/main/res/mipmap-&lt;density&gt;/ic_launcher.png</code>（48/72/96/144/192）由
+      <code>flutter test tool/export_brand_icons.dart</code> 从 <code>brand/logo/icon.svg</code> 重新生成；
+      两次运行字节一致，且导出前会校验尺寸与采样像素，坏图不会覆盖好图。</li>
+    <li><code>mipmap-anydpi-v26/ic_launcher.xml</code> 引用 <code>@color/ic_launcher_background</code>（纸色）、
+      <code>@drawable/ic_launcher_foreground</code>（铜印）、<code>@drawable/ic_launcher_monochrome</code>（书）。</li>
+    <li><code>test/brand/launcher_icon_test.dart</code> 是漂移守卫：它把四个地方的几何（SVG、导出器、两个 drawable）
+      锁在一起，并把每个 PNG 与一次实时渲染做像素比对 —— 改品牌文件却忘了同步，<code>flutter test</code> 会先报。</li>
   </ul>
+  <div class="cell-note" style="margin-top:14px">
+    还没做：字标描边成路径（现在依赖系统 serif / monospace）；启动页仍是 Flutter 默认白屏，值得单开一件事。
+  </div>
 </section>
 
 </body>

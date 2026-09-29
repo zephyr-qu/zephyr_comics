@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Adaptive icon monochrome layer (Android 13+ themed icons): the same ribbons as
-  one flat colour with no background, so the system tints the silhouette.
-  Geometry is identical to ic_launcher_foreground.xml.
--->
+<!-- Themed icons (Android 13+): the symbol alone, in one flat colour with no
+     background or disc, because the system tints the layer's alpha. The book
+     reads better than the badge at themed-icon sizes, so the disc is dropped
+     here while the geometry stays identical to brand/logo/icon.svg. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -15,13 +14,10 @@
         android:translateX="18"
         android:translateY="18">
         <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M8 36Q32 24 56 17L56 22Q32 30 8 51Z" />
+            android:pathData="M18 25L31 19.5L31 35L18 39.5Z"
+            android:fillColor="#FFFFFFFF" />
         <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M14 46Q36 36 58 30L58 35Q36 42 14 58Z" />
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M26 52Q42 46 56 43L56 47Q42 51 26 60Z" />
+            android:pathData="M33 19.5L46 25L46 39.5L33 35Z"
+            android:fillColor="#FFFFFFFF" />
     </group>
 </vector>

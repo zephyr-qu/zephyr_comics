@@ -1,12 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 130" width="160" height="130" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 124" width="160" height="124" role="img" aria-labelledby="t d">
   <title id="t">Zephyr Comics</title>
-  <desc id="d">The wind mark above the Zephyr Comics wordmark on a light ground.</desc>
-  <g transform="translate(52.8 4) scale(0.85)">
-    <path d="M8 36Q32 24 56 17L56 22Q32 30 8 51Z" fill="#7E6128"/>
-    <path d="M14 46Q36 36 58 30L58 35Q36 42 14 58Z" fill="#241F1A"/>
-    <path d="M26 52Q42 46 56 43L56 47Q42 51 26 60Z" fill="#6B6259"/>
-  </g>
+  <desc id="d">The seal above the Zephyr Comics wordmark on a light ground.</desc>
+  <path transform="translate(52.8 4) scale(0.85)" fill="#7E6128" fill-rule="evenodd" d="M9 32a23 23 0 1 0 46 0a23 23 0 0 0-46 0ZM18 25L31 19.5L31 35L18 39.5ZM33 19.5L46 25L46 39.5L33 35Z"/>
   <path d="M48 76h64" fill="none" stroke="#7E6128" stroke-width="1.5"/>
-  <text x="82" y="98" text-anchor="middle" font-family="serif" font-size="24" font-weight="600" letter-spacing="2" fill="#241F1A">ZEPHYR</text>
-  <text x="82" y="116" text-anchor="middle" font-family="monospace" font-size="9.5" letter-spacing="4.2" fill="#7E6128">COMICS</text>
+  <text x="81" y="98" text-anchor="middle" font-family="serif" font-size="24" font-weight="600" letter-spacing="2" fill="#241F1A">ZEPHYR</text>
+  <text x="80.5" y="116" text-anchor="middle" font-family="monospace" font-size="9.5" letter-spacing="4.2" fill="#7E6128">COMICS</text>
 </svg>
