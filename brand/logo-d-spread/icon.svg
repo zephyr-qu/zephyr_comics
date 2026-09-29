@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t d">
-  <title id="t">Zephyr Comics — open spread</title>
-  <desc id="d">An open book filling the tile: a pale left page and a brass right page rising toward the dark spine between them.</desc>
-  <rect width="64" height="64" rx="14" fill="#0E0D0C"/>
-  <path d="M4 19L30 11V52L4 60Z" fill="#EDE6DA"/>
-  <path d="M34 11L60 19V60L34 52Z" fill="#C9A86A"/>
-</svg>

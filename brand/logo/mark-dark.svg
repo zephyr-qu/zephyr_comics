@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t d">
-  <title id="t">Zephyr Comics — wind, single colour</title>
-  <desc id="d">The wind ribbons as a bare mark in one colour. Intended for dark backgrounds.</desc>
+  <title id="t">Zephyr Comics — mark</title>
+  <desc id="d">The wind mark in one colour, for dark grounds. Swap the fill to #241F1A on light grounds.</desc>
   <g fill="#EDE6DA">
     <path d="M8 36Q32 24 56 17L56 22Q32 30 8 51Z"/>
     <path d="M14 46Q36 36 58 30L58 35Q36 42 14 58Z"/>

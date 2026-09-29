@@ -3,233 +3,195 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zephyr Comics — Logo Concepts (2)</title>
+<title>Zephyr Comics — Identity</title>
 <style>
   :root {
     --bg: #0E0D0C; --s1: #161513; --s2: #1E1C19; --line: #262421;
     --tx: #EDE6DA; --tx2: #8B8680; --brass: #C9A86A;
-    --paper: #F4EFE6; --ink: #241F1A; --brass-deep: #7E6128;
+    --paper: #F4EFE6; --ink: #241F1A; --brass-deep: #7E6128; --ink-muted: #6B6259;
   }
   * { box-sizing: border-box; }
   body { margin:0; padding:56px 44px 96px; background:var(--bg); color:var(--tx);
          font: 400 14px/1.7 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
-  h1 { font-family: Georgia, "Times New Roman", serif; font-weight:600; font-size:30px; margin:0 0 10px; }
-  h2 { font-family: Georgia, "Times New Roman", serif; font-weight:600; font-size:20px; margin:0 0 12px; }
-  .sub { color:var(--tx2); font-size:13px; max-width:78ch; margin:0 0 30px; }
+  h1 { font-family: Georgia, "Times New Roman", serif; font-weight:600; font-size:32px; margin:0 0 8px; }
+  h2 { font-family: Georgia, "Times New Roman", serif; font-weight:600; font-size:19px; margin:0 0 14px; }
   .label { font-family: ui-monospace, Consolas, monospace; font-size:10.5px; letter-spacing:.9px;
            text-transform:uppercase; color:var(--tx2); }
-  .swatches { display:flex; gap:14px; flex-wrap:wrap; margin:26px 0 8px; }
-  .swatch { width:104px; }
-  .chip { height:44px; border-radius:10px; border:1px solid var(--line); }
-  .swatch .label { display:block; margin-top:7px; letter-spacing:.3px; text-transform:none; }
-  .concept { border-top:1px solid var(--line); margin-top:54px; padding-top:34px; }
-  .num { font-family: ui-monospace, Consolas, monospace; font-size:11px; letter-spacing:1.4px; color:var(--brass); }
-  .rationale { color:var(--tx2); max-width:76ch; margin:0 0 26px; }
-  .rationale b { color:var(--tx); font-weight:600; }
-  .row { display:flex; gap:24px; align-items:flex-end; flex-wrap:wrap; margin-bottom:24px; }
+  .lede { color:var(--tx2); font-size:13.5px; max-width:80ch; margin:0 0 34px; }
+  .lede b { color:var(--tx); }
+  section { border-top:1px solid var(--line); margin-top:50px; padding-top:32px; }
+  .row { display:flex; gap:24px; align-items:flex-end; flex-wrap:wrap; margin-bottom:22px; }
   .panel { background:var(--s1); border:1px solid var(--line); border-radius:14px; padding:20px 22px; }
   .paper { background:var(--paper); border-color:#DCD5C7; }
-  .paper .label { color:#6B6259; }
+  .paper .label, .paper .cell-note { color:#6B6259; }
   .stack { display:flex; gap:18px; align-items:flex-end; }
-  .cell { display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .cell { display:flex; flex-direction:column; align-items:center; gap:7px; }
+  .cell-note { font-family: ui-monospace, Consolas, monospace; font-size:10.5px; color:var(--tx2); }
   img { display:block; }
-  footer { border-top:1px solid var(--line); margin-top:60px; padding-top:30px; color:var(--tx2); max-width:80ch; }
-  footer li { margin-bottom:7px; }
+  table { border-collapse:collapse; font-size:13px; }
+  td, th { text-align:left; padding:7px 22px 7px 0; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { font-family: ui-monospace, Consolas, monospace; font-size:10.5px; letter-spacing:.9px;
+       text-transform:uppercase; color:var(--tx2); font-weight:400; }
+  .dot { display:inline-block; width:26px; height:26px; border-radius:7px; border:1px solid var(--line); vertical-align:middle; }
   code { font-family: ui-monospace, Consolas, monospace; color:var(--brass); font-size:12px; }
+  .cols { display:flex; gap:44px; flex-wrap:wrap; }
+  ul { margin:10px 0 0; padding-left:20px; color:var(--tx2); max-width:74ch; }
+  li { margin-bottom:8px; }
+  .no { color:#E05A4A; }
+  .yes { color:var(--brass); }
+  .clearbox { position:relative; display:inline-block; padding:12px; border:1px dashed var(--line); }
 </style>
 </head>
 <body>
 
-<h1>Zephyr Comics — logo concepts, second pass</h1>
-<p class="sub">
-  四个方向，四套不同的构图策略：满幅图形、大色块、高对比，不再有「暗底大空块里放一个小淡形状」。
-  颜色全部来自 <code>lib/theme/zephyr_theme.dart</code>；字标 <b>ZEPHYR</b> 用通用族 serif（对应主题的 display 角色）+
-  <b>COMICS</b> 用 monospace（对应 metadata 角色），两道锁定都加了一条米金细线 —— 也就是阅读页底部那条进度细线。
-  图形压在 64 格的中间约 66%，等于 Android 自适应图标的安全区。
+<h1>Zephyr Comics — identity</h1>
+<p class="lede">
+  <b>风带 / Wind.</b> 三道收笔的风带斜扫而过，左上厚、右上收成尖 —— 一笔「西风」，
+  Zephyr 就是西风的名字。图形刻意不画书、不画分格：这套身份里，<b>名字承担「风」，字标承担「漫画」</b>。
+  颜色与字阶全部来自 <code>lib/theme/zephyr_theme.dart</code>，没有引入任何新色值或字体资源。
 </p>
 
-<div class="swatches">
-  <div class="swatch"><div class="chip" style="background:#0E0D0C"></div><span class="label">#0E0D0C 暖黑底</span></div>
-  <div class="swatch"><div class="chip" style="background:#C9A86A"></div><span class="label">#C9A86A 米金</span></div>
-  <div class="swatch"><div class="chip" style="background:#EDE6DA"></div><span class="label">#EDE6DA 墨</span></div>
-  <div class="swatch"><div class="chip" style="background:#8B8680"></div><span class="label">#8B8680 次字</span></div>
-  <div class="swatch"><div class="chip" style="background:#F4EFE6"></div><span class="label">#F4EFE6 纸</span></div>
-  <div class="swatch"><div class="chip" style="background:#7E6128"></div><span class="label">#7E6128 深米金</span></div>
-</div>
-
-<section class="concept">
-  <span class="num">A / WIND</span>
-  <h2>风带</h2>
-  <p class="rationale">
-    三道收笔的风带斜扫底板，左上厚、右上收成尖。Zephyr 就是西风 —— <b>不画书，用「风」承担名字</b>。
-    锥形收笔是它和普通「三条平行线」的区别，也是这套形状里唯一的手工感。
-    代价要说清楚：图形本身不说明「阅读器」，得靠字标补。
-  </p>
+<section>
+  <h2>应用图标</h2>
   <div class="row">
     <div class="panel">
-      <span class="label">图标 / 96 · 48 · 32 · 24</span>
+      <span class="label">暖黑底 / 96 · 48 · 32 · 24</span>
       <div class="stack" style="margin-top:16px">
-        <div class="cell"><img src="logo-a-plate/icon.svg" width="96" height="96" alt=""><span class="label">96</span></div>
-        <div class="cell"><img src="logo-a-plate/icon.svg" width="48" height="48" alt=""><span class="label">48</span></div>
-        <div class="cell"><img src="logo-a-plate/icon.svg" width="32" height="32" alt=""><span class="label">32</span></div>
-        <div class="cell"><img src="logo-a-plate/icon.svg" width="24" height="24" alt=""><span class="label">24</span></div>
+        <div class="cell"><img src="logo/icon.svg" width="96" height="96" alt=""><span class="cell-note">96</span></div>
+        <div class="cell"><img src="logo/icon.svg" width="48" height="48" alt=""><span class="cell-note">48</span></div>
+        <div class="cell"><img src="logo/icon.svg" width="32" height="32" alt=""><span class="cell-note">32</span></div>
+        <div class="cell"><img src="logo/icon.svg" width="24" height="24" alt=""><span class="cell-note">24</span></div>
       </div>
     </div>
     <div class="panel paper">
-      <span class="label">图标 / 纸色底</span>
-      <div style="margin-top:16px"><img src="logo-a-plate/icon.svg" width="96" height="96" alt=""></div>
+      <span class="label">纸色底</span>
+      <div style="margin-top:16px"><img src="logo/icon.svg" width="96" height="96" alt=""></div>
     </div>
     <div class="panel">
-      <span class="label">横向锁定</span>
-      <div style="margin-top:16px"><img src="logo-a-plate/horizontal.svg" width="200" height="80" alt="Zephyr Comics"></div>
-    </div>
-  </div>
-  <div class="row">
-    <div class="panel">
-      <span class="label">竖版</span>
-      <div style="margin-top:16px"><img src="logo-a-plate/vertical.svg" width="160" height="130" alt="Zephyr Comics"></div>
-    </div>
-    <div class="panel">
-      <span class="label">单色标记（深底；浅底换成 #241F1A）</span>
-      <div class="stack" style="margin-top:16px">
-        <div class="cell" style="background:#0E0D0C;border-radius:12px;padding:10px"><img src="logo-a-plate/mark-mono.svg" width="72" height="72" alt=""></div>
-        <div class="cell" style="background:#1E1C19;border-radius:12px;padding:10px"><img src="logo-a-plate/mark-mono.svg" width="72" height="72" alt=""></div>
+      <span class="label">安全间距 / 最小尺寸</span>
+      <div style="margin-top:16px">
+        <span class="clearbox"><img src="logo/icon.svg" width="64" height="64" alt=""></span>
       </div>
+      <div class="cell-note" style="margin-top:12px">四周留白 = 图形高度的 1/4（64 格里 12px）<br>数字最小 24px，印刷最小 8mm</div>
     </div>
   </div>
 </section>
 
-<section class="concept">
-  <span class="num">B / MONOGRAM</span>
-  <h2>铜字 Z</h2>
-  <p class="rationale">
-    纸底上一个大写的几何 Z，只用一色：浅色主题那档加深米金 <code>#7E6128</code>，在纸上有 5.05:1，过 WCAG AA
-    （原型那档米金只有 3.10:1，不够）。<b>四案里最粗、24px 最清楚</b>，识别完全不靠细节，只靠 Z 的斜切收笔。
-    它也是唯一底色是亮的一案 —— 放在暗色桌面上最跳。代价：字母与全中文界面略脱节。
-  </p>
+<section>
+  <h2>横向锁定</h2>
   <div class="row">
     <div class="panel">
-      <span class="label">图标 / 96 · 48 · 32 · 24</span>
-      <div class="stack" style="margin-top:16px">
-        <div class="cell"><img src="logo-b-monogram/icon.svg" width="96" height="96" alt=""><span class="label">96</span></div>
-        <div class="cell"><img src="logo-b-monogram/icon.svg" width="48" height="48" alt=""><span class="label">48</span></div>
-        <div class="cell"><img src="logo-b-monogram/icon.svg" width="32" height="32" alt=""><span class="label">32</span></div>
-        <div class="cell"><img src="logo-b-monogram/icon.svg" width="24" height="24" alt=""><span class="label">24</span></div>
-      </div>
-    </div>
-    <div class="panel">
-      <span class="label">横向锁定</span>
-      <div style="margin-top:16px"><img src="logo-b-monogram/horizontal.svg" width="200" height="80" alt="Zephyr Comics"></div>
-    </div>
-  </div>
-  <div class="row">
-    <div class="panel">
-      <span class="label">竖版</span>
-      <div style="margin-top:16px"><img src="logo-b-monogram/vertical.svg" width="160" height="130" alt="Zephyr Comics"></div>
-    </div>
-    <div class="panel">
-      <span class="label">单色标记（深底；浅底换成 #241F1A）</span>
-      <div class="stack" style="margin-top:16px">
-        <div class="cell" style="background:#0E0D0C;border-radius:12px;padding:10px"><img src="logo-b-monogram/mark-mono.svg" width="72" height="72" alt=""></div>
-        <div class="cell" style="background:#1E1C19;border-radius:12px;padding:10px"><img src="logo-b-monogram/mark-mono.svg" width="72" height="72" alt=""></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="concept">
-  <span class="num">C / SPINES</span>
-  <h2>书脊</h2>
-  <p class="rationale">
-    三本书并排立在一条搁板上，宽度不等，<b>中间那本米金、还微微歪着</b>。歪的那一本就是「正在读」——
-    和界面里米金＝当前（阅读模式分段控件、书架选中态）是同一套语义。
-    四案里它最直白地说出「这是个书库」，也最容易理解。代价：偏几何、少一点纸感。
-  </p>
-  <div class="row">
-    <div class="panel">
-      <span class="label">图标 / 96 · 48 · 32 · 24</span>
-      <div class="stack" style="margin-top:16px">
-        <div class="cell"><img src="logo-c-spines/icon.svg" width="96" height="96" alt=""><span class="label">96</span></div>
-        <div class="cell"><img src="logo-c-spines/icon.svg" width="48" height="48" alt=""><span class="label">48</span></div>
-        <div class="cell"><img src="logo-c-spines/icon.svg" width="32" height="32" alt=""><span class="label">32</span></div>
-        <div class="cell"><img src="logo-c-spines/icon.svg" width="24" height="24" alt=""><span class="label">24</span></div>
-      </div>
+      <span class="label">深底</span>
+      <div style="margin-top:16px"><img src="logo/horizontal.svg" width="200" height="80" alt="Zephyr Comics"></div>
     </div>
     <div class="panel paper">
-      <span class="label">图标 / 纸色底</span>
-      <div style="margin-top:16px"><img src="logo-c-spines/icon.svg" width="96" height="96" alt=""></div>
-    </div>
-    <div class="panel">
-      <span class="label">横向锁定</span>
-      <div style="margin-top:16px"><img src="logo-c-spines/horizontal.svg" width="200" height="80" alt="Zephyr Comics"></div>
+      <span class="label">浅底</span>
+      <div style="margin-top:16px"><img src="logo/horizontal-light.svg" width="200" height="80" alt="Zephyr Comics"></div>
     </div>
   </div>
-  <div class="row">
-    <div class="panel">
-      <span class="label">竖版</span>
-      <div style="margin-top:16px"><img src="logo-c-spines/vertical.svg" width="160" height="130" alt="Zephyr Comics"></div>
-    </div>
-    <div class="panel">
-      <span class="label">单色标记（深底；浅底换成 #241F1A）</span>
-      <div class="stack" style="margin-top:16px">
-        <div class="cell" style="background:#0E0D0C;border-radius:12px;padding:10px"><img src="logo-c-spines/mark-mono.svg" width="72" height="72" alt=""></div>
-        <div class="cell" style="background:#1E1C19;border-radius:12px;padding:10px"><img src="logo-c-spines/mark-mono.svg" width="72" height="72" alt=""></div>
-      </div>
-    </div>
-  </div>
+  <div class="cell-note">图形与字标之间那条米金细线，就是阅读页底部那条进度细线 —— 它是这个应用自己的签名，不是装饰。</div>
 </section>
 
-<section class="concept">
-  <span class="num">D / SPREAD</span>
-  <h2>摊开的跨页</h2>
-  <p class="rationale">
-    一本从上方看下去摊开的书：左页纸色、右页米金，中间那道缝留给暗底当书脊。
-    <b>四案里「书」这件事说得最体面的一案</b>，满幅对角构图、没有一处是空的，也最适合直接当启动图标。
-    代价：图形比较满，缩小到 24px 时两页会靠色块对比来分辨。
-  </p>
+<section>
+  <h2>竖向锁定</h2>
   <div class="row">
     <div class="panel">
-      <span class="label">图标 / 96 · 48 · 32 · 24</span>
-      <div class="stack" style="margin-top:16px">
-        <div class="cell"><img src="logo-d-spread/icon.svg" width="96" height="96" alt=""><span class="label">96</span></div>
-        <div class="cell"><img src="logo-d-spread/icon.svg" width="48" height="48" alt=""><span class="label">48</span></div>
-        <div class="cell"><img src="logo-d-spread/icon.svg" width="32" height="32" alt=""><span class="label">32</span></div>
-        <div class="cell"><img src="logo-d-spread/icon.svg" width="24" height="24" alt=""><span class="label">24</span></div>
-      </div>
+      <span class="label">深底</span>
+      <div style="margin-top:16px"><img src="logo/vertical.svg" width="160" height="130" alt="Zephyr Comics"></div>
     </div>
     <div class="panel paper">
-      <span class="label">图标 / 纸色底</span>
-      <div style="margin-top:16px"><img src="logo-d-spread/icon.svg" width="96" height="96" alt=""></div>
-    </div>
-    <div class="panel">
-      <span class="label">横向锁定</span>
-      <div style="margin-top:16px"><img src="logo-d-spread/horizontal.svg" width="200" height="80" alt="Zephyr Comics"></div>
+      <span class="label">浅底</span>
+      <div style="margin-top:16px"><img src="logo/vertical-light.svg" width="160" height="130" alt="Zephyr Comics"></div>
     </div>
   </div>
+</section>
+
+<section>
+  <h2>单色标记</h2>
   <div class="row">
     <div class="panel">
-      <span class="label">竖版</span>
-      <div style="margin-top:16px"><img src="logo-d-spread/vertical.svg" width="160" height="130" alt="Zephyr Comics"></div>
-    </div>
-    <div class="panel">
-      <span class="label">单色标记（深底；浅底换成 #241F1A）</span>
+      <span class="label">深底用 / 暖黑 · --s1 · --s2</span>
       <div class="stack" style="margin-top:16px">
-        <div class="cell" style="background:#0E0D0C;border-radius:12px;padding:10px"><img src="logo-d-spread/mark-mono.svg" width="72" height="72" alt=""></div>
-        <div class="cell" style="background:#1E1C19;border-radius:12px;padding:10px"><img src="logo-d-spread/mark-mono.svg" width="72" height="72" alt=""></div>
+        <div class="cell" style="background:#0E0D0C;border-radius:12px;padding:12px"><img src="logo/mark-dark.svg" width="64" height="64" alt=""></div>
+        <div class="cell" style="background:#161513;border-radius:12px;padding:12px"><img src="logo/mark-dark.svg" width="64" height="64" alt=""></div>
+        <div class="cell" style="background:#1E1C19;border-radius:12px;padding:12px"><img src="logo/mark-dark.svg" width="64" height="64" alt=""></div>
+      </div>
+      <div class="cell-note" style="margin-top:12px">用于水印、封面角标、加载态</div>
+    </div>
+    <div class="panel paper">
+      <span class="label">浅底用 / 纸 · 纸白</span>
+      <div class="stack" style="margin-top:16px">
+        <div class="cell" style="background:#F4EFE6;border-radius:12px;padding:12px"><img src="logo/mark-light.svg" width="64" height="64" alt=""></div>
+        <div class="cell" style="background:#FBF8F3;border-radius:12px;padding:12px"><img src="logo/mark-light.svg" width="64" height="64" alt=""></div>
       </div>
     </div>
   </div>
 </section>
 
-<footer>
-  <span class="label">本轮不含 / 选定后再做</span>
+<section>
+  <h2>颜色与字阶</h2>
+  <div class="cols">
+    <div>
+      <table>
+        <tr><th>用途</th><th>值</th><th>来源</th></tr>
+        <tr><td><span class="dot" style="background:#0E0D0C"></span> 底板</td><td><code>#0E0D0C</code></td><td>主题 <code>surface</code></td></tr>
+        <tr><td><span class="dot" style="background:#C9A86A"></span> 米金</td><td><code>#C9A86A</code></td><td>主题 <code>primary</code></td></tr>
+        <tr><td><span class="dot" style="background:#EDE6DA"></span> 墨</td><td><code>#EDE6DA</code></td><td>主题 <code>onSurface</code></td></tr>
+        <tr><td><span class="dot" style="background:#8B8680"></span> 次字</td><td><code>#8B8680</code></td><td>主题 <code>onSurfaceVariant</code></td></tr>
+        <tr><td><span class="dot" style="background:#7E6128"></span> 深米金（浅底）</td><td><code>#7E6128</code></td><td>主题浅色 <code>primary</code></td></tr>
+        <tr><td><span class="dot" style="background:#241F1A"></span> 墨（浅底）</td><td><code>#241F1A</code></td><td>主题浅色 <code>onSurface</code></td></tr>
+      </table>
+      <div class="cell-note" style="margin-top:14px">
+        浅色底换色不是偏好问题：原型那档米金在纸底上只有 3.10:1，不到 WCAG AA；
+        深米金是 5.05:1。这两条数字来自 <code>zephyr_theme.dart</code> 的注释与主题测试。
+      </div>
+    </div>
+    <div>
+      <table>
+        <tr><th>角色</th><th>字体</th></tr>
+        <tr><td>ZEPHYR（display）</td><td>serif 600，字距 +2.2px</td></tr>
+        <tr><td>COMICS（metadata）</td><td>monospace，字距 +4.4px</td></tr>
+      </table>
+      <div class="cell-note" style="margin-top:14px">
+        与主题里 display / metadata 两个角色一一对应，不引入字体资源。
+        定稿若要脱离系统字体，需要把字标描边成路径。
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>用法</h2>
+  <div class="cols">
+    <div>
+      <span class="label">要</span>
+      <ul>
+        <li><span class="yes">✓</span> 深底用深底文件、浅底用浅底文件 —— 两套是配好对的，别自己换色。</li>
+        <li><span class="yes">✓</span> 缩放保持等比；锁定组里图形与字标的间距、细线长度都由文件给出，不要重排。</li>
+        <li><span class="yes">✓</span> 需要单色时用 <code>mark-dark</code> / <code>mark-light</code>，不要给彩色版去饱和。</li>
+        <li><span class="yes">✓</span> 小到 24px 时优先用方图标，不要硬塞横向锁定（字会先糊）。</li>
+      </ul>
+    </div>
+    <div>
+      <span class="label">不要</span>
+      <ul>
+        <li><span class="no">✗</span> 拉伸、压扁、旋转、切掉风带的收笔尖。</li>
+        <li><span class="no">✗</span> 加阴影、描边、发光、渐变 —— 风带是靠锥形收笔立住的，加效果就散。</li>
+        <li><span class="no">✗</span> 把米金换成其它金色，或用非主题色。</li>
+        <li><span class="no">✗</span> 把图形放进比安全间距更窄的空间。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>还没做</h2>
   <ul>
-    <li>字标转路径：现在依赖系统 serif / monospace，换机器可能落到别的字，定稿要描边。</li>
-    <li>Android 落地：自适应图标的背景层应当是<b>满幅方图</b>（系统自己做圆角遮罩），现在的圆角底板只是展示用；<code>mipmap-*/ic_launcher.png</code> 由 Flutter 的 <code>dart:ui</code> 渲染导出，不引入外部工具。</li>
-    <li>浅色底成套版本（纸底用 <code>#241F1A</code> 墨 + <code>#7E6128</code> 深米金）、安全间距、最小尺寸、错误用法。</li>
-    <li>启动画面 / 关于页里的横版应用（需要的话）。</li>
+    <li><b>Android 落地</b>：<code>mipmap-*/ic_launcher.png</code> 与自适应图标两层。注意自适应图标的<b>背景层应当是满幅方图</b>（系统自己做圆角遮罩），现在这枚圆角底板只是展示形态；前景层是风带，压在中间 66%（= 72dp / 108dp 安全区）。本机没有 inkscape / ImageMagick，导出打算用无头 Chrome 或 Flutter 的 <code>dart:ui</code>，都不引外部依赖。</li>
+    <li><b>字标描边成路径</b>：现在 <code>ZEPHYR</code> / <code>COMICS</code> 是 <code>&lt;text&gt;</code>，依赖系统字体。</li>
+    <li>启动画面、关于页里的应用（需要时按现有锁定文件缩放即可）。</li>
   </ul>
-</footer>
+</section>
 
 </body>
 </html>

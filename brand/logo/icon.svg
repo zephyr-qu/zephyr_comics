@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t d">
-  <title id="t">Zephyr Comics — wind</title>
-  <desc id="d">Three tapered ribbons of wind sweeping up across the tile, in brass, pale cream and grey.</desc>
+  <title id="t">Zephyr Comics</title>
+  <desc id="d">Three tapered ribbons of wind sweeping up across a warm-black tile, in brass, pale cream and grey.</desc>
   <rect width="64" height="64" rx="14" fill="#0E0D0C"/>
   <path d="M8 36Q32 24 56 17L56 22Q32 30 8 51Z" fill="#C9A86A"/>
   <path d="M14 46Q36 36 58 30L58 35Q36 42 14 58Z" fill="#EDE6DA"/>
