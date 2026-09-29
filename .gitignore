@@ -38,7 +38,16 @@ migrate_working_dir/
 /rust/src/frb_generated.rs
 
 # Local tool state — per-machine, not part of the app
+# Local tool state — per-machine, not part of the app
 /.commandcode/
+/.ruff_cache/
+/android/.kotlin/
+
+# Local AI tooling — per-machine workflows, not part of the app
+/.trellis/
+/.agents/
+/.pi/
+/.codex/
 
 # Design prototypes (local reference material, never shipped)
 /designs/
