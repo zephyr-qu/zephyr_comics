@@ -1,7 +1,7 @@
 # Zephyr Comics Architecture V3
 
 > Status: Authoritative target architecture for the personal Android MVP  
-> Supersedes: `开发设计文档 V1.0.md` and `ARCHITECTURE_V2.md`
+> Replaces the earlier V1 requirements/design documents and `ARCHITECTURE_V2.md`, which were removed from the repository; their content is fully superseded by this document.
 
 ## 1. Architectural Drivers
 

@@ -1,23 +1,16 @@
 # Zephyr Comics MVP Delivery Roadmap
 
-> This roadmap implements `PRODUCT_REQUIREMENTS_V2.md` through independently verifiable Trellis child tasks.
+> This roadmap implements `PRODUCT_REQUIREMENTS_V2.md`.
 
-> Status: implementation gates completed and archived on 2026-08-03. Device-only performance evidence remains a user acceptance step.
+> Status: every implementation gate below was completed on 2026-08-03. Device-only performance evidence remains a user acceptance step.
+>
+> Traceability: each phase was originally delivered as a separate tracked work item. Those records are not part of the repository; use the git history for per-item detail.
 
 ## Gate 0 — Existing Foundations
 
 Existing shell, ReaderSession, real encoded-page path, library scan fixes, and continuous prefetch work are retained and audited. They are not treated as complete merely because code exists; each must be incorporated into a clean baseline with passing verification.
 
-Related tasks:
-
-- `07-17-flutter-shell-reader`
-- `07-31-reader-session`
-- `08-03-continuous-reader-prefetch`
-- `00-bootstrap-guidelines`
-
 ## Phase 1 — Buildable Baseline
-
-Task: `08-03-mvp-baseline`
 
 - Audit the dirty worktree and existing task ownership.
 - Preserve and commit a coherent buildable baseline.
@@ -33,8 +26,6 @@ Exit gate: a clean checkout can run verification and build the current app witho
 
 ## Phase 2 — Trustworthy Library
 
-Task: `08-03-mvp-library`
-
 - Direct filesystem access and permission recovery.
 - One Library Root and incremental refresh.
 - Accurate CBZ/ZIP format messaging.
@@ -47,8 +38,6 @@ Exit gate: repeated startup/refresh operations produce a stable, truthful librar
 
 ## Phase 3 — Complete Reading Records
 
-Task: `08-03-mvp-reading-records`
-
 - Comic detail screen.
 - Real reading history.
 - Per-comic bookmarks.
@@ -60,8 +49,6 @@ Exit gate: every comic can be entered, resumed, restarted, bookmarked, finished,
 
 ## Phase 4 — Reader and Product Experience
 
-Task: `08-03-mvp-reader-experience`
-
 - Complete reader toolbar and Android back behavior.
 - Implement all approved user settings and defaults.
 - First-launch and permission states.
@@ -72,8 +59,6 @@ Task: `08-03-mvp-reader-experience`
 Exit gate: every route feels intentional, has loading/empty/error/content states, and contains no demo or misleading affordance.
 
 ## Phase 5 — Performance and APK
-
-Task: `08-03-mvp-release`
 
 - Profile/release first-page and continuous-reader measurements.
 - 100-page stability and memory check.
@@ -94,4 +79,4 @@ Baseline
                  -> Performance and APK
 ```
 
-Phases may research ahead, but implementation does not start out of order. Each child task is reviewed and archived before its dependent phase begins.
+Phases may research ahead, but implementation does not start out of order. Each phase is reviewed before its dependent phase begins.
