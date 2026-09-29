@@ -40,6 +40,9 @@
   .no { color:#E05A4A; }
   .yes { color:var(--brass); }
   .clearbox { position:relative; display:inline-block; padding:12px; border:1px dashed var(--line); }
+  .launcher { width:150px; height:150px; overflow:hidden; background:var(--bg);
+              box-shadow: 0 0 0 1px var(--line); }
+  .launcher svg { display:block; width:100%; height:100%; }
 </style>
 </head>
 <body>
@@ -73,6 +76,89 @@
         <span class="clearbox"><img src="logo/icon.svg" width="64" height="64" alt=""></span>
       </div>
       <div class="cell-note" style="margin-top:12px">四周留白 = 图形高度的 1/4（64 格里 12px）<br>数字最小 24px，印刷最小 8mm</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>自适应图标 / Android 落地</h2>
+  <p class="lede">
+    自适应图标在 <b>108dp 画布</b>上合成：背景层是满幅暖黑（圆角交给系统的遮罩，不再自己描圆角），前景层是三条风带，
+    按 <code>scale = 72/64 = 1.125</code>、<code>translate = 18</code> 压进中央 <b>72dp 安全区</b>。
+    下面把安全区标出来，并分别套上圆形与方圆遮罩，让「风带不会被裁到」这件事看得见。
+  </p>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <g id="zephyr-adaptive">
+        <rect width="108" height="108" fill="#0E0D0C"/>
+        <g transform="translate(18 18) scale(1.125)">
+          <path d="M8 36Q32 24 56 17L56 22Q32 30 8 51Z" fill="#C9A86A"/>
+          <path d="M14 46Q36 36 58 30L58 35Q36 42 14 58Z" fill="#EDE6DA"/>
+          <path d="M26 52Q42 46 56 43L56 47Q42 51 26 60Z" fill="#8B8680"/>
+        </g>
+      </g>
+      <g id="zephyr-monochrome" transform="translate(18 18) scale(1.125)" fill="currentColor">
+        <path d="M8 36Q32 24 56 17L56 22Q32 30 8 51Z"/>
+        <path d="M14 46Q36 36 58 30L58 35Q36 42 14 58Z"/>
+        <path d="M26 52Q42 46 56 43L56 47Q42 51 26 60Z"/>
+      </g>
+    </defs>
+  </svg>
+
+  <div class="row">
+    <div class="panel">
+      <span class="label">108dp 画布 / 72dp 安全区</span>
+      <div style="margin-top:16px">
+        <svg viewBox="0 0 108 108" width="150" height="150" role="img" aria-label="自适应图标的背景、前景与安全区">
+          <use href="#zephyr-adaptive"/>
+          <rect x="18" y="18" width="72" height="72" fill="none" stroke="#C9A86A" stroke-opacity=".6" stroke-dasharray="3 3"/>
+        </svg>
+      </div>
+      <div class="cell-note" style="margin-top:12px">虚线内为中央 72dp；外侧 18dp 供遮罩裁剪与视差</div>
+    </div>
+    <div class="panel">
+      <span class="label">圆形遮罩</span>
+      <div class="launcher" style="border-radius:50%; margin-top:16px">
+        <svg viewBox="0 0 108 108"><use href="#zephyr-adaptive"/></svg>
+      </div>
+    </div>
+    <div class="panel">
+      <span class="label">方圆遮罩</span>
+      <div class="launcher" style="border-radius:26%; margin-top:16px">
+        <svg viewBox="0 0 108 108"><use href="#zephyr-adaptive"/></svg>
+      </div>
+    </div>
+    <div class="panel">
+      <span class="label">单色层 / 主题着色示例</span>
+      <div class="launcher" style="border-radius:26%; margin-top:16px; color:#C9E4FF; background:#22303C">
+        <svg viewBox="0 0 108 108"><use href="#zephyr-monochrome"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols" style="margin-top:10px">
+    <div>
+      <span class="label">生成的资源</span>
+      <table style="margin-top:10px">
+        <tr><th>文件</th><th>角色</th><th>来源</th></tr>
+        <tr><td><code>mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher.png</code></td><td>48 / 72 / 96 / 144 / 192 px</td><td>导出脚本</td></tr>
+        <tr><td><code>mipmap-anydpi-v26/ic_launcher.xml</code></td><td>背景 + 前景 + 单色层</td><td>手写</td></tr>
+        <tr><td><code>drawable/ic_launcher_foreground.xml</code></td><td>风带前景（108 视口）</td><td>手写</td></tr>
+        <tr><td><code>drawable/ic_launcher_monochrome.xml</code></td><td>单色剪影</td><td>手写</td></tr>
+        <tr><td><code>values/ic_launcher_background.xml</code></td><td>背景 <code>#0E0D0C</code></td><td>手写</td></tr>
+      </table>
+    </div>
+    <div>
+      <span class="label">重新生成</span>
+      <p class="lede" style="margin:12px 0 0; max-width:56ch">
+        一条命令从 <code>brand/logo/icon.svg</code> 重出全部 PNG：
+      </p>
+      <p style="margin:10px 0 0"><code>flutter test tool/export_brand_icons.dart</code></p>
+      <div class="cell-note" style="margin-top:14px">
+        导出器用 <code>dart:ui</code> 渲染，写盘前会重新解码校尺寸、采样颜色，不合格即中止；
+        日常由 <code>test/brand/launcher_icon_test.dart</code> 守门，缺图、尺寸错、不是风标都会红。
+      </div>
     </div>
   </div>
 </section>
@@ -187,9 +273,8 @@
 <section>
   <h2>还没做</h2>
   <ul>
-    <li><b>Android 落地</b>：<code>mipmap-*/ic_launcher.png</code> 与自适应图标两层。注意自适应图标的<b>背景层应当是满幅方图</b>（系统自己做圆角遮罩），现在这枚圆角底板只是展示形态；前景层是风带，压在中间 66%（= 72dp / 108dp 安全区）。本机没有 inkscape / ImageMagick，导出打算用无头 Chrome 或 Flutter 的 <code>dart:ui</code>，都不引外部依赖。</li>
     <li><b>字标描边成路径</b>：现在 <code>ZEPHYR</code> / <code>COMICS</code> 是 <code>&lt;text&gt;</code>，依赖系统字体。</li>
-    <li>启动画面、关于页里的应用（需要时按现有锁定文件缩放即可）。</li>
+    <li><b>启动画面</b>：<code>drawable/launch_background.xml</code> 还是 Flutter 默认的白屏，对暖黑应用来说不对，值得单独一个任务。</li>
   </ul>
 </section>
 

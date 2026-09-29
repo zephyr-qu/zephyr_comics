@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon monochrome layer (Android 13+ themed icons): the same ribbons as
+  one flat colour with no background, so the system tints the silhouette.
+  Geometry is identical to ic_launcher_foreground.xml.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="1.125"
+        android:scaleY="1.125"
+        android:translateX="18"
+        android:translateY="18">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M8 36Q32 24 56 17L56 22Q32 30 8 51Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M14 46Q36 36 58 30L58 35Q36 42 14 58Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M26 52Q42 46 56 43L56 47Q42 51 26 60Z" />
+    </group>
+</vector>

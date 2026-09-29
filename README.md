@@ -44,3 +44,8 @@ pwsh -NoProfile -File tool/verify_mvp.ps1
 The gate runs Dart format checking, Flutter analyze/tests, Rust tests, and a
 release APK build. The resulting APK is
 `build/app/outputs/flutter-apk/app-release.apk`.
+
+The Android launcher icons are generated from `brand/logo/icon.svg`; regenerate
+them with `flutter test tool/export_brand_icons.dart`. The normal test suite
+guards the committed icons via `test/brand/launcher_icon_test.dart` and fails if
+they are missing, mis-sized, or not the wind mark.

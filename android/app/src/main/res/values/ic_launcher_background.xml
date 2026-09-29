@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Warm black, theme surface. Full bleed: the launcher mask does the rounding. -->
+    <color name="ic_launcher_background">#0E0D0C</color>
+</resources>
