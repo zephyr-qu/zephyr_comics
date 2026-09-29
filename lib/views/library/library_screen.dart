@@ -32,7 +32,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         bottom: false,
         child: SignalBuilder(
           builder: (context) {
-            final path = settingsSnapshot.value.scanDirectoryPath;
+            final path = settings.scanDirectoryPath.value;
             final snapshot = librarySnapshot.value;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -252,6 +252,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Widget _buildGrid(BuildContext context, List<ComicLibraryEntry> entries) {
+    final coverWidth = _cellWidth(context);
     return RefreshIndicator(
       onRefresh: refreshLibrary,
       child: GridView.builder(
@@ -268,7 +269,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
           mainAxisSpacing: ZephyrSpacing.xl,
         ),
         itemCount: entries.length,
-        itemBuilder: (context, index) => _ComicCard(entry: entries[index]),
+        itemBuilder: (context, index) =>
+            _ComicCard(entry: entries[index], coverWidth: coverWidth),
       ),
     );
   }
@@ -278,14 +280,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
     return (width / 150).floor().clamp(2, 6);
   }
 
+  /// The shelf grid's column width — which is also the cover's on-screen width,
+  /// and therefore the bound the cover decode is clamped to.
+  double _cellWidth(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final columns = _columnCount(context);
+    return (width - _pageMargin - _gridGap * (columns - 1)) / columns;
+  }
+
   /// A cell is a 3:4 cover plus a fixed-height text block, so the grid ratio has
   /// to be derived from the column width — a constant would overflow the cell on
   /// narrow screens.
   double _aspectRatio(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final columns = _columnCount(context);
-    final cellWidth =
-        (width - _pageMargin - _gridGap * (columns - 1)) / columns;
+    final cellWidth = _cellWidth(context);
     return cellWidth / (cellWidth * 4 / 3 + _cardTextHeight);
   }
 
@@ -450,8 +457,12 @@ class _SearchField extends StatelessWidget {
 }
 
 class _ComicCard extends StatelessWidget {
-  const _ComicCard({required this.entry});
+  const _ComicCard({required this.entry, required this.coverWidth});
   final ComicLibraryEntry entry;
+
+  /// The cover's on-screen width. Bounds the decode so a full-resolution cover
+  /// is not rasterised at its intrinsic size inside this cell.
+  final double coverWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -467,13 +478,6 @@ class _ComicCard extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(ZephyrRadius.card),
-                boxShadow: [
-                  BoxShadow(
-                    color: scheme.shadow.withValues(alpha: 0.5),
-                    blurRadius: 30,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(ZephyrRadius.card),
@@ -491,6 +495,10 @@ class _ComicCard extends StatelessWidget {
                           entry.coverData!,
                           fit: BoxFit.cover,
                           width: double.infinity,
+                          cacheWidth:
+                              (coverWidth *
+                                      MediaQuery.devicePixelRatioOf(context))
+                                  .round(),
                         ),
                 ),
               ),

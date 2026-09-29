@@ -15,6 +15,7 @@ use std::time::SystemTime;
 use zip::ZipArchive;
 
 use crate::error::{ComicError, Result};
+use crate::sort::{filter_image_files, natural_sort};
 
 /// 默认最大缓存句柄数
 const DEFAULT_MAX_HANDLES: usize = 5;
@@ -46,6 +47,8 @@ pub struct ArchiveCache {
 struct CachedArchive {
     archive: ZipArchive<File>,
     file_names: Option<Vec<String>>,
+    /// The image entries, filtered and naturally sorted once per handle.
+    page_names: Option<Vec<String>>,
     fingerprint: ArchiveFingerprint,
 }
 
@@ -77,73 +80,86 @@ impl ArchiveCache {
     /// 句柄数量受 LRU 风格的上限控制。
     pub fn extract_file(&mut self, path: &str, file_name: &str) -> Result<Vec<u8>> {
         self.access_count += 1;
-
         let cached = self.cached_archive(path)?;
-        let archive = &mut cached.archive;
-
-        // 查找并读取文件
-        let entry = archive
-            .by_name(file_name)
-            .map_err(|e| ComicError::FileNotFound(format!("文件不存在：{}", e)))?;
-
-        // Never trust `entry.size()`: it is attacker-controlled for a malformed
-        // archive. Cap both the pre-allocation and the bytes actually read, and
-        // treat an over-sized entry as a corrupt page rather than truncating it.
-        let declared = usize::try_from(entry.size()).unwrap_or(0);
-        let mut buffer = Vec::with_capacity(declared.min(MAX_ENTRY_BYTES));
-        let read = entry
-            .take(MAX_ENTRY_BYTES as u64 + 1)
-            .read_to_end(&mut buffer)?;
-        if read > MAX_ENTRY_BYTES {
-            return Err(ComicError::ArchiveError(format!(
-                "压缩包条目过大：{}",
-                file_name
-            )));
-        }
-
-        Ok(buffer)
+        read_entry(cached, file_name)
     }
 
-    /// Reads only the leading bytes needed for lightweight image metadata.
-    pub fn extract_file_prefix(
+    /// Extract one page by index in a single lock.
+    ///
+    /// The page list stays inside the handle: only the requested entry's bytes
+    /// are copied out, so a page turn no longer clones the whole page table.
+    pub fn extract_page(&mut self, path: &str, index: usize) -> Result<Vec<u8>> {
+        self.access_count += 1;
+        let cached = self.cached_archive(path)?;
+        ensure_page_names(cached)?;
+        let name = {
+            let pages = cached
+                .page_names
+                .as_ref()
+                .ok_or_else(|| ComicError::Internal("压缩包页表未建立".to_string()))?;
+            pages
+                .get(index)
+                .cloned()
+                .ok_or(ComicError::PageIndexOutOfBounds {
+                    requested: index,
+                    total: pages.len(),
+                })?
+        };
+        read_entry(cached, &name)
+    }
+
+    /// Read just the leading bytes of the page at `index`, again without
+    /// materialising the whole page table for the caller.
+    pub fn extract_page_prefix(
         &mut self,
         path: &str,
-        file_name: &str,
+        index: usize,
         max_bytes: usize,
     ) -> Result<Vec<u8>> {
         self.access_count += 1;
-
         let cached = self.cached_archive(path)?;
-        let archive = &mut cached.archive;
-        let entry = archive
-            .by_name(file_name)
-            .map_err(|e| ComicError::FileNotFound(format!("文件不存在：{}", e)))?;
-        let capacity = usize::try_from(entry.size())
-            .unwrap_or(max_bytes)
-            .min(max_bytes);
-        let mut buffer = Vec::with_capacity(capacity);
-        entry.take(max_bytes as u64).read_to_end(&mut buffer)?;
-        Ok(buffer)
+        ensure_page_names(cached)?;
+        let name = {
+            let pages = cached
+                .page_names
+                .as_ref()
+                .ok_or_else(|| ComicError::Internal("压缩包页表未建立".to_string()))?;
+            pages
+                .get(index)
+                .cloned()
+                .ok_or(ComicError::PageIndexOutOfBounds {
+                    requested: index,
+                    total: pages.len(),
+                })?
+        };
+        read_entry_prefix(cached, &name, max_bytes)
+    }
+
+    /// The number of readable pages, resolved without copying the page list.
+    pub fn page_count(&mut self, path: &str) -> Result<usize> {
+        self.access_count += 1;
+        let cached = self.cached_archive(path)?;
+        ensure_page_names(cached)?;
+        Ok(cached.page_names.as_ref().map_or(0, Vec::len))
     }
 
     /// 列出 ZIP 中的所有文件名。
     pub fn list_files(&mut self, path: &str) -> Result<Vec<String>> {
         self.access_count += 1;
         let cached = self.cached_archive(path)?;
-        if let Some(file_names) = &cached.file_names {
-            return Ok(file_names.clone());
-        }
+        ensure_file_names(cached)?;
+        Ok(cached.file_names.as_ref().cloned().unwrap_or_default())
+    }
 
-        let archive = &mut cached.archive;
-        let mut files = Vec::with_capacity(archive.len());
-        for index in 0..archive.len() {
-            let entry = archive.by_index(index)?;
-            if entry.is_file() {
-                files.push(entry.name().to_string());
-            }
-        }
-        cached.file_names = Some(files.clone());
-        Ok(files)
+    /// The archive's image entries in natural sort order, cached on the handle.
+    ///
+    /// The reader asks for one page at a time, so re-filtering and re-sorting
+    /// the whole listing on every request is pure waste.
+    pub fn list_page_files(&mut self, path: &str) -> Result<Vec<String>> {
+        self.access_count += 1;
+        let cached = self.cached_archive(path)?;
+        ensure_page_names(cached)?;
+        Ok(cached.page_names.as_ref().cloned().unwrap_or_default())
     }
 
     fn ensure_open(&mut self, path: &str) -> Result<()> {
@@ -168,6 +184,7 @@ impl ArchiveCache {
             CachedArchive {
                 archive,
                 file_names: None,
+                page_names: None,
                 fingerprint,
             },
         );
@@ -230,6 +247,77 @@ impl ArchiveCache {
     }
 }
 
+/// Read one entry's full payload. `entry.size()` is attacker-controlled for a
+/// malformed archive, so both the pre-allocation and the bytes actually read are
+/// capped; an over-sized entry is a corrupt page, not a truncated one.
+fn read_entry(cached: &mut CachedArchive, file_name: &str) -> Result<Vec<u8>> {
+    let entry = cached
+        .archive
+        .by_name(file_name)
+        .map_err(|e| ComicError::FileNotFound(format!("文件不存在：{}", e)))?;
+
+    let declared = usize::try_from(entry.size()).unwrap_or(0);
+    let mut buffer = Vec::with_capacity(declared.min(MAX_ENTRY_BYTES));
+    let read = entry
+        .take(MAX_ENTRY_BYTES as u64 + 1)
+        .read_to_end(&mut buffer)?;
+    if read > MAX_ENTRY_BYTES {
+        return Err(ComicError::ArchiveError(format!(
+            "压缩包条目过大：{}",
+            file_name
+        )));
+    }
+    Ok(buffer)
+}
+
+/// Read a bounded prefix of one entry, for lightweight image metadata.
+fn read_entry_prefix(
+    cached: &mut CachedArchive,
+    file_name: &str,
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
+    let entry = cached
+        .archive
+        .by_name(file_name)
+        .map_err(|e| ComicError::FileNotFound(format!("文件不存在：{}", e)))?;
+    let capacity = usize::try_from(entry.size())
+        .unwrap_or(max_bytes)
+        .min(max_bytes);
+    let mut buffer = Vec::with_capacity(capacity);
+    entry.take(max_bytes as u64).read_to_end(&mut buffer)?;
+    Ok(buffer)
+}
+
+/// Populate the handle's raw file listing once.
+fn ensure_file_names(cached: &mut CachedArchive) -> Result<()> {
+    if cached.file_names.is_some() {
+        return Ok(());
+    }
+    let mut files = Vec::with_capacity(cached.archive.len());
+    for index in 0..cached.archive.len() {
+        let entry = cached.archive.by_index(index)?;
+        if entry.is_file() {
+            files.push(entry.name().to_string());
+        }
+    }
+    cached.file_names = Some(files);
+    Ok(())
+}
+
+/// Populate the handle's filtered, naturally sorted page list once.
+fn ensure_page_names(cached: &mut CachedArchive) -> Result<()> {
+    if cached.page_names.is_some() {
+        return Ok(());
+    }
+    ensure_file_names(cached)?;
+    let pages = {
+        let files = cached.file_names.as_deref().unwrap_or(&[]);
+        natural_sort(&filter_image_files(files))
+    };
+    cached.page_names = Some(pages);
+    Ok(())
+}
+
 // ============ 全局缓存实例 ============
 
 use once_cell::sync::Lazy;
@@ -250,24 +338,51 @@ pub fn extract_file_from_cache(path: &str, file_name: &str) -> Result<Vec<u8>> {
     cache.extract_file(path, file_name)
 }
 
-/// Reads a bounded prefix from a file in the global archive cache.
-pub fn extract_file_prefix_from_cache(
-    path: &str,
-    file_name: &str,
-    max_bytes: usize,
-) -> Result<Vec<u8>> {
-    let mut cache = GLOBAL_ARCHIVE_CACHE
-        .lock()
-        .map_err(|e| ComicError::Internal(format!("压缩包缓存锁中毒：{}", e)))?;
-    cache.extract_file_prefix(path, file_name, max_bytes)
-}
-
 /// 从全局归档缓存列出文件名。
 pub fn list_files_from_cache(path: &str) -> Result<Vec<String>> {
     let mut cache = GLOBAL_ARCHIVE_CACHE
         .lock()
         .map_err(|e| ComicError::Internal(format!("压缩包缓存锁中毒：{}", e)))?;
     cache.list_files(path)
+}
+
+/// Lists the archive's page entries, filtered and naturally sorted, from the
+/// global archive cache.
+pub fn list_page_files_from_cache(path: &str) -> Result<Vec<String>> {
+    let mut cache = GLOBAL_ARCHIVE_CACHE
+        .lock()
+        .map_err(|e| ComicError::Internal(format!("压缩包缓存锁中毒：{}", e)))?;
+    cache.list_page_files(path)
+}
+
+/// Extract one page by index from the global cache, without cloning the page
+/// table out to the caller.
+pub fn extract_page_from_cache(path: &str, index: usize) -> Result<Vec<u8>> {
+    let mut cache = GLOBAL_ARCHIVE_CACHE
+        .lock()
+        .map_err(|e| ComicError::Internal(format!("压缩包缓存锁中毒：{}", e)))?;
+    cache.extract_page(path, index)
+}
+
+/// Read a bounded prefix of one page by index from the global cache.
+pub fn extract_page_prefix_from_cache(
+    path: &str,
+    index: usize,
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
+    let mut cache = GLOBAL_ARCHIVE_CACHE
+        .lock()
+        .map_err(|e| ComicError::Internal(format!("压缩包缓存锁中毒：{}", e)))?;
+    cache.extract_page_prefix(path, index, max_bytes)
+}
+
+/// The archive's page count from the global cache, resolved without copying the
+/// page list.
+pub fn page_count_from_cache(path: &str) -> Result<usize> {
+    let mut cache = GLOBAL_ARCHIVE_CACHE
+        .lock()
+        .map_err(|e| ComicError::Internal(format!("压缩包缓存锁中毒：{}", e)))?;
+    cache.page_count(path)
 }
 
 /// 设置全局缓存大小
@@ -351,6 +466,39 @@ mod tests {
             .extract_file(second.to_str().unwrap(), "001.png")
             .unwrap();
         assert_eq!(cache.get_stats().cached_handles, 1);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn list_page_files_filters_sorts_and_caches() {
+        let dir = std::env::temp_dir().join(format!("zephyr_archive_pages_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let archive_path = dir.join("pages.cbz");
+
+        use std::io::Write;
+        let file = File::create(&archive_path).unwrap();
+        let mut archive = zip::ZipWriter::new(file);
+        for name in ["10.png", "2.png", "1.png", "notes.txt"] {
+            archive
+                .start_file(name, zip::write::FileOptions::default())
+                .unwrap();
+            archive.write_all(b"x").unwrap();
+        }
+        archive.finish().unwrap();
+
+        let mut cache = ArchiveCache::new(1);
+        let path = archive_path.to_string_lossy().to_string();
+
+        assert_eq!(
+            cache.list_page_files(&path).unwrap(),
+            vec!["1.png", "2.png", "10.png"]
+        );
+        // Filtered and sorted once: the second call comes off the handle.
+        assert_eq!(
+            cache.list_page_files(&path).unwrap(),
+            vec!["1.png", "2.png", "10.png"]
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     }

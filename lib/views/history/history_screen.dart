@@ -235,7 +235,7 @@ class _ResumeCard extends StatelessWidget {
                     child: _CoverThumb(
                       entry: libraryEntry,
                       radius: ZephyrRadius.card,
-                      elevated: true,
+                      decodeWidth: 74,
                     ),
                   ),
                 ),
@@ -340,6 +340,7 @@ class _HistoryTile extends StatelessWidget {
                         child: _CoverThumb(
                           entry: libraryEntry,
                           radius: ZephyrRadius.small,
+                          decodeWidth: 48,
                         ),
                       ),
                     ),
@@ -414,13 +415,17 @@ class _HistoryTile extends StatelessWidget {
 /// The prototype's cover placeholder: a 3:4 tile that falls back to a glyph
 /// when the shelf has no cover bytes for the file.
 class _CoverThumb extends StatelessWidget {
-  const _CoverThumb({this.entry, required this.radius, this.elevated = false});
+  const _CoverThumb({
+    this.entry,
+    required this.radius,
+    required this.decodeWidth,
+  });
 
   final ComicLibraryEntry? entry;
   final double radius;
 
-  /// `.sa-resume-cover` floats on its own shadow; list thumbnails sit flat.
-  final bool elevated;
+  /// The thumb's on-screen width, used to bound the cover decode.
+  final double decodeWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -431,22 +436,15 @@ class _CoverThumb extends StatelessWidget {
         color: scheme.surfaceContainerHighest,
         child: entry?.coverData == null
             ? Icon(Icons.menu_book_outlined, color: scheme.onSurfaceVariant)
-            : Image.memory(entry!.coverData!, fit: BoxFit.cover),
+            : Image.memory(
+                entry!.coverData!,
+                fit: BoxFit.cover,
+                cacheWidth:
+                    (decodeWidth * MediaQuery.devicePixelRatioOf(context))
+                        .round(),
+              ),
       ),
     );
-    if (!elevated) return cover;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(alpha: 0.55),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: cover,
-    );
+    return cover;
   }
 }

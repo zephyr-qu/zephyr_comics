@@ -44,11 +44,6 @@ impl ComicMetadata {
         Self::default()
     }
 
-    /// 从文件路径提取元数据
-    pub fn from_file(file_path: &str) -> Result<Self> {
-        extract_metadata(file_path)
-    }
-
     /// 是否包含有效信息
     pub fn is_empty(&self) -> bool {
         self.title.is_none() && self.author.is_none()

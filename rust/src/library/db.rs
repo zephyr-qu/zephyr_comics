@@ -598,6 +598,38 @@ impl LibraryDatabase {
 
         Ok(())
     }
+
+    /// Bytes and count of the derived covers held in the library table.
+    pub fn derived_cache_stats(&self) -> Result<DerivedCacheStats> {
+        let conn = self.conn();
+        conn.query_row(
+            "SELECT COALESCE(SUM(LENGTH(cover_data)), 0), COUNT(cover_data) FROM library",
+            [],
+            |row| {
+                Ok(DerivedCacheStats {
+                    bytes: u64::try_from(row.get::<_, i64>(0)?).unwrap_or(0),
+                    entries: usize::try_from(row.get::<_, i64>(1)?).unwrap_or(0),
+                })
+            },
+        )
+        .map_err(|e| db_err("统计派生缓存失败", e))
+    }
+
+    /// Drops every derived cover. The source comics and the reading records are
+    /// untouched; the next scan rebuilds the covers.
+    pub fn clear_derived_covers(&self) -> Result<()> {
+        let conn = self.conn();
+        conn.execute("UPDATE library SET cover_data = NULL", [])
+            .map_err(|e| db_err("清除派生缓存失败", e))?;
+        Ok(())
+    }
+}
+
+/// 派生缓存（库表内的封面数据）的统计。
+#[derive(Debug, Clone)]
+pub struct DerivedCacheStats {
+    pub bytes: u64,
+    pub entries: usize,
 }
 
 /// 图书馆条目
@@ -622,17 +654,21 @@ pub struct LibraryEntry {
 
 use std::sync::OnceLock;
 
-static GLOBAL_DB: OnceLock<Arc<Mutex<LibraryDatabase>>> = OnceLock::new();
+static GLOBAL_DB: OnceLock<Arc<LibraryDatabase>> = OnceLock::new();
 
 /// 初始化全局数据库
 pub fn init_global_db(db_path: Option<PathBuf>) -> Result<()> {
     let db = LibraryDatabase::new(db_path)?;
-    GLOBAL_DB.get_or_init(|| Arc::new(Mutex::new(db)));
+    GLOBAL_DB.get_or_init(|| Arc::new(db));
     Ok(())
 }
 
 /// 获取全局数据库实例
-pub fn get_global_db() -> Option<Arc<Mutex<LibraryDatabase>>> {
+///
+/// The connection is already guarded inside [`LibraryDatabase`], so callers must
+/// not wrap it in a second lock: holding one across a scan's file IO would block
+/// every progress save, bookmark and history read while the shelf rebuilds.
+pub fn get_global_db() -> Option<Arc<LibraryDatabase>> {
     GLOBAL_DB.get().cloned()
 }
 
@@ -670,6 +706,38 @@ mod tests {
         db.remove_bookmark("test.cbz", 5).unwrap();
         let bookmarks = db.get_bookmarks("test.cbz").unwrap();
         assert!(bookmarks.is_empty());
+    }
+
+    #[test]
+    fn derived_cache_stats_follow_the_stored_covers() {
+        let db = create_test_db();
+        assert_eq!(db.derived_cache_stats().unwrap().entries, 0);
+
+        db.add_to_library(&LibraryEntry {
+            file_path: "covered.cbz".to_string(),
+            title: Some("Covered".to_string()),
+            author: None,
+            publisher: None,
+            description: None,
+            genres: vec![],
+            year: None,
+            format: "cbz".to_string(),
+            file_size: 10,
+            total_pages: 1,
+            cover_data: Some(vec![7u8; 32]),
+            added_at: 100,
+            last_opened_at: None,
+        })
+        .unwrap();
+
+        let stats = db.derived_cache_stats().unwrap();
+        assert_eq!(stats.entries, 1);
+        assert_eq!(stats.bytes, 32);
+
+        db.clear_derived_covers().unwrap();
+        let cleared = db.derived_cache_stats().unwrap();
+        assert_eq!(cleared.entries, 0);
+        assert_eq!(cleared.bytes, 0);
     }
 
     #[test]

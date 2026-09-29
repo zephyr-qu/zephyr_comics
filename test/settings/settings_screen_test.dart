@@ -147,7 +147,6 @@ void main() {
 
     final adapter = InMemoryDerivedCacheAdapter(
       bytes: 129 * 1024 * 1024,
-      limitBytes: 256 * 1024 * 1024,
       entries: 42,
     );
     await tester.pumpWidget(

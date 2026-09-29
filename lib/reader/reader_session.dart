@@ -54,7 +54,11 @@ final class ReaderSession {
   final int? initialPage;
   final Duration saveDelay;
   final snapshot = ValueNotifier<ReaderSnapshot>(const ReaderOpening());
-  static const int _prefetchAhead = 8;
+
+  /// Prefetch is sized for a local ZIP, not a network source: the bytes come
+  /// off a local disk, so a deep window only costs memory and FFI copies. (A
+  /// network reader wants a much deeper one — see Mihon's `HttpPageLoader`.)
+  static const int _prefetchAhead = 3;
   static const int _prefetchBehind = 2;
   static const int _maxConcurrentPageLoads = 2;
   static const int _maxPendingPageLoads = _prefetchAhead + _prefetchBehind + 1;

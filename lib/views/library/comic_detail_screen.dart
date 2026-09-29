@@ -221,13 +221,6 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(ZephyrRadius.card),
-                  boxShadow: [
-                    BoxShadow(
-                      color: scheme.shadow.withValues(alpha: 0.72),
-                      blurRadius: 60,
-                      offset: const Offset(0, 26),
-                    ),
-                  ],
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(ZephyrRadius.card),
@@ -245,6 +238,11 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                             widget.entry.coverData!,
                             fit: BoxFit.cover,
                             width: double.infinity,
+                            // The hero is a fixed 166px cover, so bound the decode
+                            // there instead of at the image's intrinsic size.
+                            cacheWidth:
+                                (166 * MediaQuery.devicePixelRatioOf(context))
+                                    .round(),
                           ),
                   ),
                 ),
@@ -398,16 +396,19 @@ class _BookmarkRow extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  SizedBox(
-                    width: 54,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 54),
                     child: Text(
                       '第 ${bookmark.pageIndex + 1} 页',
+                      maxLines: 1,
+                      softWrap: false,
                       style: theme.textTheme.labelMedium?.copyWith(
                         fontSize: 11.5,
                         color: scheme.primary,
                       ),
                     ),
                   ),
+                  const SizedBox(width: ZephyrSpacing.md),
                   Expanded(
                     child: Text(
                       bookmark.note ?? '阅读时标记',

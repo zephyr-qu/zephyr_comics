@@ -210,9 +210,9 @@ void main() {
       expect(engine.loads, [0, 1]);
       await releaseRequestedPages(engine);
 
-      expect(engine.loads.toSet(), {0, 1, 2, 3, 4});
+      expect(engine.loads.toSet(), {0, 1, 2, 3});
       expect(engine.maxActiveLoads, 2);
-      expect(session.cachedPageIndexes.length, lessThanOrEqualTo(7));
+      expect(session.cachedPageIndexes.length, lessThanOrEqualTo(4));
       await session.close();
     },
   );
@@ -248,7 +248,7 @@ void main() {
     session.moveTo(4);
     await Future<void>.delayed(Duration.zero);
 
-    expect(session.cachedPageIndexes, {0, 1, 2, 3, 4, 5, 6});
+    expect(session.cachedPageIndexes, {1, 2, 3, 4, 5, 6});
     expect(engine.loads.where((index) => index == 3), hasLength(1));
     expect(engine.loads.where((index) => index == 4), hasLength(1));
     await session.close();

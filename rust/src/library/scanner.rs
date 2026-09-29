@@ -157,22 +157,6 @@ impl LibraryScanner {
         })
     }
 
-    /// 扫描所有已配置的路径
-    pub fn scan_all(&self) -> Result<Vec<LibraryEntry>> {
-        let mut all_entries = Vec::new();
-
-        for scan_path in &self.scan_paths {
-            match self.scan_directory(&scan_path.to_string_lossy()) {
-                Ok(entries) => all_entries.extend(entries),
-                Err(e) => {
-                    log::warn!("扫描路径 {:?} 失败：{}", scan_path, e);
-                }
-            }
-        }
-
-        Ok(all_entries)
-    }
-
     /// 增量扫描 (只扫描新文件)
     pub fn scan_incremental(&self, db: &LibraryDatabase) -> Result<Vec<LibraryEntry>> {
         let mut paths = Vec::new();
