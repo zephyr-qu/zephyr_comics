@@ -41,7 +41,7 @@ migrate_working_dir/
 /.ruff_cache/
 /android/.kotlin/
 
-# Local AI tooling — per-machine workflows, not part of the app
+# Per-machine state — not part of the app
 /.trellis/
 /.agents/
 /.pi/
