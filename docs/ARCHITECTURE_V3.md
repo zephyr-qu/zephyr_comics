@@ -126,7 +126,7 @@ SQLite 使用显式 schema 版本与向前迁移。应用升级绝不把"删除�
 - Widget 测试覆盖路由状态与用户操作，而不是模块私有状态。
 - 仅在真机上运行的 profile/release 检查覆盖首屏延迟、滚动与内存峰值。
 
-真实的 Flutter -> FRB -> Rust -> 图片路径目前没有自动化覆盖：集成测试只做应用启动的冒烟检查，端到端读取只在真机上的 profile/release 阅读流程中被验证。
+真实的 Flutter -> FRB -> Rust -> 图片路径不在默认门禁的覆盖范围内：`integration_test/reader_performance_test.dart` 走这条路径并断言首屏预算，但需要手工提供 CBZ（`READER_BENCHMARK_CBZ`）才会启用，未启用时被跳过。端到端读取只在真机上的 profile/release 阅读流程中被验证。
 
 当深层模块接口已经覆盖了同样的行为时，测试会替换掉过时的浅层路径测试。
 

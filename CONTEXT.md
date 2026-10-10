@@ -1,6 +1,6 @@
 # Zephyr Comics 领域语言
 
-Zephyr Comics 是一个个人自用的离线 Android 漫画阅读器。本术语表定义了需求、代码、测试与界面文案共同使用的产品语言。
+Zephyr Comics 是一个由单人开发、现已公开的离线 Android 漫画阅读器。本术语表定义了需求、代码、测试与界面文案共同使用的产品语言。
 
 ## 书架（Library）
 
