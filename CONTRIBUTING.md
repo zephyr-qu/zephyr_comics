@@ -45,6 +45,16 @@ Rust 测试各自在临时目录里构造 CBZ/ZIP，仓库不存放二进制 fix
 - release 构建会打印一条缺少 `CupertinoIcons` 字体的 tree-shaker 警告。这是 Flutter 工具链的已知缺陷（[flutter#119074](https://github.com/flutter/flutter/issues/119074)），应用自身不渲染任何 Cupertino 图标，因此可以忽略；不要为了消除它而重新引入 `cupertino_icons` 依赖。
 - 真机性能与启动证据（首屏 1.5 秒、连续 100 页、内存 300 MB 目标）只能由人在真机上采集，不属于自动化门禁。改动涉及阅读器性能时，请写明你测了什么、怎么测的。
 
+## 品牌资源
+
+Android 启动器图标由 `brand/logo/icon.svg` 生成，重新导出的命令是：
+
+```powershell
+flutter test tool/export_brand_icons.dart
+```
+
+`test/brand/launcher_icon_test.dart` 守护已提交的图标：图标缺失、尺寸错误或不再是印章标识都会导致测试失败。其余组合——`horizontal`、`vertical` 与独立的 mark，各有深色底与浅色底版本——位于 `brand/logo/`。
+
 ## 提交信息
 
 使用英文 Conventional Commits：

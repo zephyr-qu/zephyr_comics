@@ -42,102 +42,34 @@ Zephyr Comics 是一个离线 Android 漫画阅读器：整理并阅读你设备
 
 ## 当前状态
 
-2026-10-10 使用 Flutter 3.47.2 / Dart 3.13.2 实测，以下命令全部通过：
-
-```text
-dart format --output=none --set-exit-if-changed lib test integration_test
-flutter analyze --no-fatal-infos
-flutter test                 # 105 通过
-cargo test --manifest-path rust/Cargo.toml          # 49 通过
-cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
-flutter build apk --release  # 成功
-```
-
-上表由 `tool/verify_mvp.ps1` 一次性完成；测试数量会随提交变化，此处记录的是上述日期实测值，不是长期承诺。release APK 体积随工具链浮动，因此不在此写死。
-
-这些数字只出现在本节；其余小节不重复。
+2026-10-10 使用 Flutter 3.47.2 / Dart 3.13.2 实测，`tool/verify_mvp.ps1` 的七个阶段全部通过：生成绑定、Dart 格式检查、`flutter analyze`、105 个 Flutter 测试、49 个 Rust 测试、clippy（`-D warnings`）、release APK 构建。测试数量随提交变化，此处是上述日期的实测值，不是长期承诺。
 
 两项已知缺口，都不属于代码缺陷：
 
 - 真机性能与启动证据从未采集（首个可见页面 1.5 秒、连续阅读 100 页、内存 300 MB 目标）——只能由人在真机上采集，属于用户验收步骤。
-- 真实的 Flutter → FRB → Rust → 图片路径不在默认门禁的覆盖范围内：`integration_test/reader_performance_test.dart` 走这条路径并断言首屏 1.5 秒预算，但必须手工提供 CBZ（`READER_BENCHMARK_CBZ`）才启用，否则整个测试被跳过；端到端读取在真机阅读流程中被验证。
+- 真实的 Flutter → FRB → Rust → 图片路径不在默认门禁的覆盖范围内：`integration_test/reader_performance_test.dart` 走这条路径并断言首屏 1.5 秒预算，但必须手工提供 CBZ（`READER_BENCHMARK_CBZ`）才启用，否则整个测试被跳过；端到端读取只在真机上验证。
 
-本仓库不发布预编译 APK，也没有应用商店页面：阅读器请按下一节在本地构建。
+本仓库不发布预编译 APK，也没有应用商店页面：请按下一节在本地构建。
 
 ## 构建与运行
 
-### 环境要求
-
-| 依赖 | 要求 |
-|------|------|
-| Flutter | 3.44+（Dart 3.12+）；本仓库 `pubspec.yaml` 强制最低 Dart `^3.10.9`，本机实测 Flutter 3.47.2 / Dart 3.13.2 |
-| Rust | Cargo，以及 clippy 组件：`rustup component add clippy` |
-| Android SDK | 需安装 API 36（`compileSdk 36`；`targetSdk 35`，最低 API 30，即 Android 11 及以上） |
-| flutter_rust_bridge_codegen | 2.12.0：`cargo install flutter_rust_bridge_codegen --version 2.12.0` |
-| LLVM | 仅当 codegen 报告找不到 `libclang` 时需要：把 LLVM 的 `bin` 目录加入 `PATH` |
-
-Android 应用 ID 为 `com.zephyr.comics`。release 产物使用本地调试签名，用于真机测试，不用于应用商店发布。
-
-### 生成 Flutter-Rust 绑定
-
-FRB 绑定是生成产物、不入库：`lib/src/rust/` 与 `rust/src/frb_generated.rs` 都被忽略，而 `rust/src/lib.rs` 声明了 `mod frb_generated;`。新克隆必须先完成一次生成，否则 Rust crate 无法编译——在下面这条命令跑过之前，`cargo test` 会一直失败：
-
 ```powershell
-flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml
+flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml   # 新克隆必须先跑，绑定不入库
+pwsh -NoProfile -File tool/verify_mvp.ps1                                      # 完整门禁；APK 在 build/app/outputs/flutter-apk/
 ```
 
-### 门禁
-
-运行完整本地门禁：
-
-```powershell
-pwsh -NoProfile -File tool/verify_mvp.ps1
-```
-
-门禁依次执行七个阶段：生成绑定、`dart format` 检查、`flutter analyze`、`flutter test`、`cargo test`、`cargo clippy -D warnings`、release APK 构建。它先重新生成被忽略的绑定，跑完后工作树保持干净。产物 APK 位于 `build/app/outputs/flutter-apk/app-release.apk`。
-
-> release 构建会打印一条关于缺少 `CupertinoIcons` 字体的 tree-shaker 警告。这是 Flutter 工具链的已知缺陷（[flutter#119074](https://github.com/flutter/flutter/issues/119074)），应用自身不渲染任何 Cupertino 图标，因此可以忽略；不要为了消除它而重新引入 `cupertino_icons` 依赖，`pubspec.yaml` 中也记录了这一点。
-
-### 品牌资源
-
-Android 启动器图标由 `brand/logo/icon.svg` 生成，重新导出的命令是：
-
-```powershell
-flutter test tool/export_brand_icons.dart
-```
-
-`test/brand/launcher_icon_test.dart` 守护已提交的图标：图标缺失、尺寸错误或不再是印章标识都会导致测试失败。其余组合——`horizontal`、`vertical` 与独立的 mark，各有深色底与浅色底版本——位于 `brand/logo/`。
+环境要求（Flutter 3.44+、Rust 与 clippy、Android SDK API 36、`flutter_rust_bridge_codegen` 2.12.0）、七个门禁阶段、品牌图标的导出命令、提交信息与代码约定，都在 [CONTRIBUTING.md](CONTRIBUTING.md)。应用 ID 为 `com.zephyr.comics`，release 产物使用本地调试签名，不用于应用商店发布。
 
 ## 项目结构
 
 ```text
-lib/                 Flutter 应用
-├── models/          产品数据模型
-├── library/         ComicLibrary：根目录、扫描、去重、搜索排序
-├── reader/          ReaderSession / ReaderEngine：打开、翻页、进度、预取
-├── reading/         ReadingRecords：历史、书签、完成状态
-├── settings/        AppSettings：用户可见偏好与默认值
-├── services/        Android 平台适配（权限、音量键、屏幕常亮、偏好存储）
-├── views/           路由页面与 Widget
-├── router/ theme/ utils/ signals/
-└── main.dart app.dart
-
-rust/src/            Rust 后端
-├── api/             FFI 入口（flutter_rust_bridge），仅编排
-├── archive.rs       CBZ/ZIP 读取
-├── cache/           已打开 ZIP 句柄 + 页表缓存
-├── library/         db.rs / scanner.rs / progress.rs
-├── metadata.rs      ComicInfo.xml 与封面缩略图
-├── sort.rs types.rs error.rs lib.rs
-
-rust_builder/        cargokit 打包工程（含 vendored 第三方代码）
-tool/                本地脚本：品牌图标导出、门禁
-test/ integration_test/ test_driver/    测试
-brand/logo/          品牌矢量资源
-docs/                PRD、架构、路线图、ADR
+lib/           Flutter 应用：models/ library/ reader/ reading/ settings/ services/ views/ router/ theme/ utils/ signals/
+rust/src/      Rust 后端：api/ 仅编排；archive.rs、library/、cache/、metadata.rs、sort.rs
+rust_builder/  cargokit 打包工程（含 vendored 第三方代码）
+test/ integration_test/ test_driver/   测试      tool/ 本地脚本      brand/logo/ 品牌矢量资源      docs/ PRD、架构、路线图与 ADR
 ```
 
-`lib/` 与 `rust/` 的职责边界：Flutter 不直接解析压缩包、不直接读写 SQLite；Rust 不做页面像素解码，页面以压缩包内的原始编码字节交给 Flutter，在显示尺寸上解码。
+`lib/` 与 `rust/` 的边界：Flutter 不直接解析压缩包、不直接读写 SQLite；Rust 不做页面像素解码，页面以压缩包内的原始编码字节交给 Flutter，在显示尺寸上解码。更细的目录与分层约定见 [AGENTS.md](AGENTS.md) 与[架构 V3](docs/ARCHITECTURE_V3.md)。
 
 ## 文档
 

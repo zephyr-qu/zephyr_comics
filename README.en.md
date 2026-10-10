@@ -44,102 +44,34 @@ Unsupported formats are rejected honestly with a clear message and are never adv
 
 ## Current status
 
-Measured on 2026-10-10 with Flutter 3.47.2 / Dart 3.13.2; all of the following commands passed:
-
-```text
-dart format --output=none --set-exit-if-changed lib test integration_test
-flutter analyze --no-fatal-infos
-flutter test                 # 105 passed
-cargo test --manifest-path rust/Cargo.toml          # 49 passed
-cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
-flutter build apk --release  # succeeded
-```
-
-The table above is produced in one shot by `tool/verify_mvp.ps1`; test counts change with every commit, so the numbers here are measurements from that date, not a standing promise. The release APK size drifts with the toolchain and is deliberately not fixed here.
-
-These numbers appear only in this section; no other section repeats them.
+Measured on 2026-10-10 with Flutter 3.47.2 / Dart 3.13.2: all seven stages of `tool/verify_mvp.ps1` pass — generate bindings, Dart format check, `flutter analyze`, 105 Flutter tests, 49 Rust tests, clippy (`-D warnings`), release APK build. Test counts change with every commit; these are measurements from that date, not a standing promise.
 
 Two known gaps, neither of them a code defect:
 
 - Real-device performance and startup evidence has never been collected (first visible page within 1.5 s, 100 consecutive pages, 300 MB memory target) — it can only be gathered by a person on a real device, and it is a user acceptance step.
-- The real Flutter → FRB → Rust → image path is not covered by the default gate: `integration_test/reader_performance_test.dart` exercises that path and asserts the 1.5 s first-page budget, but it only runs when a CBZ is supplied by hand (`READER_BENCHMARK_CBZ`) and is skipped otherwise; end-to-end reading is verified in the on-device reading flow.
+- The real Flutter → FRB → Rust → image path is not covered by the default gate: `integration_test/reader_performance_test.dart` exercises that path and asserts the 1.5 s first-page budget, but it only runs when a CBZ is supplied by hand (`READER_BENCHMARK_CBZ`) and is skipped otherwise; end-to-end reading is verified on a real device only.
 
 This repository publishes no prebuilt APK and has no app-store page: build the reader locally by following the next section.
 
 ## Build and run
 
-### Requirements
-
-| Dependency | Requirement |
-|------------|-------------|
-| Flutter | 3.44+ (Dart 3.12+); this repository's `pubspec.yaml` enforces a minimum Dart of `^3.10.9`; measured locally with Flutter 3.47.2 / Dart 3.13.2 |
-| Rust | Cargo, plus the clippy component: `rustup component add clippy` |
-| Android SDK | API 36 required (`compileSdk 36`; `targetSdk 35`, minimum API 30, i.e. Android 11 and above) |
-| flutter_rust_bridge_codegen | 2.12.0: `cargo install flutter_rust_bridge_codegen --version 2.12.0` |
-| LLVM | Only when codegen reports that it cannot find `libclang`: add LLVM's `bin` directory to `PATH` |
-
-The Android application ID is `com.zephyr.comics`. The release artifact is signed with the local debug key and is meant for on-device testing, not for app-store distribution.
-
-### Generate the Flutter-Rust bindings
-
-The FRB bindings are generated artifacts and are not committed: both `lib/src/rust/` and `rust/src/frb_generated.rs` are ignored, while `rust/src/lib.rs` declares `mod frb_generated;`. A fresh clone must generate them once, otherwise the Rust crate cannot compile — `cargo test` keeps failing until this command has run:
-
 ```powershell
-flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml
+flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml   # required on a fresh clone; bindings are not committed
+pwsh -NoProfile -File tool/verify_mvp.ps1                                      # full gate; the APK lands in build/app/outputs/flutter-apk/
 ```
 
-### Gate
-
-Run the full local gate:
-
-```powershell
-pwsh -NoProfile -File tool/verify_mvp.ps1
-```
-
-The gate runs seven stages in order: generate bindings, `dart format` check, `flutter analyze`, `flutter test`, `cargo test`, `cargo clippy -D warnings`, release APK build. It regenerates the ignored bindings first and leaves the working tree clean. The APK lands at `build/app/outputs/flutter-apk/app-release.apk`.
-
-> The release build prints a tree-shaker warning about a missing `CupertinoIcons` font. This is a known Flutter toolchain defect ([flutter#119074](https://github.com/flutter/flutter/issues/119074)); the app never renders a Cupertino icon, so it is safe to ignore. Do not re-add the `cupertino_icons` dependency to silence it — `pubspec.yaml` records this as well.
-
-### Brand assets
-
-The Android launcher icon is generated from `brand/logo/icon.svg`; re-export it with:
-
-```powershell
-flutter test tool/export_brand_icons.dart
-```
-
-`test/brand/launcher_icon_test.dart` guards the committed icons: a missing icon, a wrong size, or an icon that is no longer the seal mark fails the test. The other lockups — `horizontal`, `vertical` and the standalone mark, each in dark-ground and light-ground variants — live in `brand/logo/`.
+Requirements (Flutter 3.44+, Rust with clippy, Android SDK API 36, `flutter_rust_bridge_codegen` 2.12.0), the seven gate stages, the brand-icon export command, commit messages and code conventions all live in [CONTRIBUTING.md](CONTRIBUTING.md). The Android application ID is `com.zephyr.comics`; the release artifact is signed with the local debug key and is not for app-store distribution.
 
 ## Project structure
 
 ```text
-lib/                 Flutter app
-├── models/          Product data models
-├── library/         ComicLibrary: root folder, scanning, dedup, search and sort
-├── reader/          ReaderSession / ReaderEngine: open, page turn, progress, prefetch
-├── reading/         ReadingRecords: history, bookmarks, finished state
-├── settings/        AppSettings: user-visible preferences and defaults
-├── services/        Android platform adapters (permissions, volume keys, screen-on, preferences)
-├── views/           Routed screens and widgets
-├── router/ theme/ utils/ signals/
-└── main.dart app.dart
-
-rust/src/            Rust backend
-├── api/             FFI entry points (flutter_rust_bridge), orchestration only
-├── archive.rs       CBZ/ZIP reading
-├── cache/           Open ZIP handles + page table cache
-├── library/         db.rs / scanner.rs / progress.rs
-├── metadata.rs      ComicInfo.xml and cover thumbnails
-├── sort.rs types.rs error.rs lib.rs
-
-rust_builder/        cargokit build glue (contains vendored third-party code)
-tool/                Local scripts: brand icon export, gate
-test/ integration_test/ test_driver/    Tests
-brand/logo/          Brand vector assets
-docs/                PRD, architecture, roadmap, ADRs
+lib/           Flutter app: models/ library/ reader/ reading/ settings/ services/ views/ router/ theme/ utils/ signals/
+rust/src/      Rust backend: api/ is orchestration only; archive.rs, library/, cache/, metadata.rs, sort.rs
+rust_builder/  cargokit build glue (contains vendored third-party code)
+test/ integration_test/ test_driver/   tests      tool/ local scripts      brand/logo/ brand vectors      docs/ PRD, architecture, roadmap and ADRs
 ```
 
-The `lib/` / `rust/` boundary: Flutter does not parse archives or touch SQLite directly; Rust does no page pixel decoding — pages are handed to Flutter as the archive's original encoded bytes and decoded there at display size.
+The `lib/` / `rust/` boundary: Flutter does not parse archives or touch SQLite directly; Rust does no page pixel decoding — pages are handed to Flutter as the archive's original encoded bytes and decoded there at display size. For the detailed layout and layering conventions see [AGENTS.md](AGENTS.md) and [Architecture V3](docs/ARCHITECTURE_V3.md).
 
 ## Documents
 
